@@ -16,6 +16,8 @@ Consulta: 23 de noviembre de 2026. Las versiones de SDK, runtime y librerías ca
 - [Expo FileSystem](https://docs.expo.dev/versions/latest/sdk/filesystem/) — archivos locales; verificar API vigente para descargas y persistencia.
 - [Expo: Splash screen and app icon](https://docs.expo.dev/develop/user-interface/splash-screen-and-app-icon/) — icono PNG y configuración del icono adaptativo; Expo Go muestra su propio icono.
 - [Expo app config](https://docs.expo.dev/versions/latest/config/app/) — `android.icon`, imagen de primer plano, fondo y capa monocromática adaptativa.
+- [Expo DocumentPicker (SDK 58)](https://docs.expo.dev/versions/v58.0.0/sdk/document-picker/) — selector de documentos y `copyToCacheDirectory` para leer archivos seleccionados.
+- [Expo FileSystem (SDK 58)](https://docs.expo.dev/versions/v58.0.0/sdk/filesystem/) — API `File`, `Directory`, `Paths`, copia y lectura por bloques.
 - [NativeWind instalación Expo](https://www.nativewind.dev/docs/getting-started/installation) — configuración estable v4 con Expo, Tailwind 3, Babel, Metro y tipos TypeScript. Sus compatibilidades específicas con Expo SDK deben revalidarse al actualizar.
 
 ## Lectura digital y derechos

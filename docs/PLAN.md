@@ -26,6 +26,8 @@ Las duraciones son estimaciones relativas para un equipo pequeño y deben recali
 
 **Avance inicial:** existe scaffold Expo SDK 58, configuración Android con icono Lumbre, base NativeWind/Tailwind, SQLite inicial con migración `user_version=1`, y pantalla inicial de Biblioteca/Descubrir/Ajustes con tema claro/oscuro. El catálogo todavía muestra su estado de próxima etapa y no simula resultados.
 
+**Avance de biblioteca local:** se implementó selección de archivo EPUB con Document Picker Android, límite de 100 MB, comprobación inicial del contenedor ZIP, copia al directorio privado `documents/books` e inserción de metadatos en SQLite. El archivo queda guardado localmente; la apertura/lectura y la validación completa de EPUB dependen de la siguiente fase de lector.
+
 ## Fase 3 — Dominio, SQLite y biblioteca local (1–2 semanas)
 
 **Trabajo:** entidades y errores, esquema versionado, migraciones, repositorios, fixtures legalmente utilizables, biblioteca, colecciones, ajustes y preferencias persistentes; importación local prototipo.

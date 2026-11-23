@@ -27,4 +27,4 @@ La implementación usa Expo SDK 58, React Native, TypeScript, SQLite y NativeWin
 
 ## Estado
 
-La primera iteración implementa los cimientos de Expo, una biblioteca local vacía y el cambio de tema. El catálogo y las descargas dentro de la app todavía están pendientes de las siguientes fases.
+La primera etapa implementa los cimientos Expo, la biblioteca local y el cambio de tema. La biblioteca ya permite importar EPUBs desde el selector de Android, copiar cada archivo al almacenamiento privado de la app y guardar sus metadatos en SQLite. El lector, el catálogo y las descargas desde Internet siguen pendientes.

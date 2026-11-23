@@ -9,6 +9,7 @@ import { useColorScheme } from 'nativewind';
 
 import { migrateDatabase } from './src/database/migrations';
 import type { Publication } from './src/database/types';
+import { importEpub } from './src/features/library/import-epub';
 
 type Tab = 'library' | 'discover' | 'settings';
 
@@ -17,15 +18,40 @@ function AppContent() {
   const { colorScheme, toggleColorScheme } = useColorScheme();
   const [activeTab, setActiveTab] = useState<Tab>('library');
   const [books, setBooks] = useState<Publication[]>([]);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
   const isDark = colorScheme === 'dark';
+
+  async function refreshLibrary() {
+    const rows = await database.getAllAsync<Publication>(
+      'SELECT * FROM publications ORDER BY COALESCE(last_opened_at, added_at) DESC',
+    );
+    setBooks(rows);
+  }
+
+  async function handleImport() {
+    setImportError(null);
+    setIsImporting(true);
+    try {
+      const imported = await importEpub(database);
+      if (imported) {
+        await refreshLibrary();
+        setActiveTab('library');
+      }
+    } catch (error) {
+      setImportError(
+        error instanceof Error ? error.message : 'No se pudo importar el libro.',
+      );
+    } finally {
+      setIsImporting(false);
+    }
+  }
 
   useEffect(() => {
     let isMounted = true;
 
     database
-      .getAllAsync<Publication>(
-        'SELECT * FROM publications ORDER BY COALESCE(last_opened_at, added_at) DESC',
-      )
+      .getAllAsync<Publication>('SELECT * FROM publications ORDER BY COALESCE(last_opened_at, added_at) DESC')
       .then((rows) => {
         if (isMounted) setBooks(rows);
       })
@@ -83,10 +109,28 @@ function AppContent() {
                   <Text className="font-editorial text-2xl text-paper-ink dark:text-night-ink">
                     Mi biblioteca
                   </Text>
-                  <Text className="text-sm text-paper-subtle dark:text-night-subtle">
-                    {books.length} {books.length === 1 ? 'libro' : 'libros'}
-                  </Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Importar un archivo EPUB"
+                    disabled={isImporting}
+                    onPress={handleImport}
+                    className="rounded-full px-3 py-2"
+                  >
+                    <Text className="text-sm font-semibold text-paper-green dark:text-night-green">
+                      {isImporting ? 'Importando…' : '＋ Añadir EPUB'}
+                    </Text>
+                  </Pressable>
                 </View>
+
+                <Text className="mt-3 text-sm text-paper-subtle dark:text-night-subtle">
+                  {books.length} {books.length === 1 ? 'libro' : 'libros'} guardados en este dispositivo
+                </Text>
+
+                {importError ? (
+                  <View accessibilityRole="alert" className="mt-4 rounded-xl bg-red-100 px-4 py-3 dark:bg-red-950">
+                    <Text className="text-sm text-red-900 dark:text-red-100">{importError}</Text>
+                  </View>
+                ) : null}
 
                 {books.length === 0 ? (
                   <View className="flex-1 items-center justify-center py-12">
@@ -104,11 +148,21 @@ function AppContent() {
                     </Text>
                     <Pressable
                       accessibilityRole="button"
-                      onPress={() => setActiveTab('discover')}
+                      disabled={isImporting}
+                      onPress={handleImport}
                       className="mt-7 rounded-full bg-paper-green px-6 py-4 dark:bg-night-green"
                     >
                       <Text className="font-semibold text-white dark:text-night-canvas">
-                        Explorar libros
+                        {isImporting ? 'Importando…' : 'Importar un EPUB'}
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => setActiveTab('discover')}
+                      className="mt-4 rounded-full px-6 py-3"
+                    >
+                      <Text className="font-semibold text-paper-green dark:text-night-green">
+                        Explorar catálogo próximamente
                       </Text>
                     </Pressable>
                   </View>
