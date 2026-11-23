@@ -28,6 +28,8 @@ Las duraciones son estimaciones relativas para un equipo pequeño y deben recali
 
 **Avance de biblioteca local:** se implementó selección de archivo EPUB con Document Picker Android, límite de 100 MB, comprobación inicial del contenedor ZIP, copia al directorio privado `documents/books` e inserción de metadatos en SQLite. El archivo queda guardado localmente; la apertura/lectura y la validación completa de EPUB dependen de la siguiente fase de lector.
 
+**Avance del lector EPUB:** integrado `react-native-readium` (Readium nativo para Android) mediante un development build Expo. La biblioteca abre los EPUB importados; el lector restaura y guarda el locator/progreso en SQLite, y ofrece temas papel/sepia/noche y tamaño de letra persistidos. La migración `user_version=2` añade posiciones y preferencias. La fase queda en implementación: falta aceptación en dispositivo Android real/emulador y ampliar navegación, tabla de contenidos, marcadores, anotaciones y pruebas con EPUB diversos.
+
 ## Fase 3 — Dominio, SQLite y biblioteca local (1–2 semanas)
 
 **Trabajo:** entidades y errores, esquema versionado, migraciones, repositorios, fixtures legalmente utilizables, biblioteca, colecciones, ajustes y preferencias persistentes; importación local prototipo.
@@ -36,9 +38,9 @@ Las duraciones son estimaciones relativas para un equipo pequeño y deben recali
 
 ## Fase 4 — Lectura EPUB (2–4 semanas)
 
-**Trabajo:** integración de renderer, índice de contenidos, navegación, locator estable, guardado periódico/reanudación, tipografía, temas, márgenes, interlineado, marcadores y anotaciones según capacidades.
+**Trabajo:** completado el spike y elegida la integración `react-native-readium` 5.3 sobre el toolkit Readium Android. El puente usa Kotlin 2.3.20 y requiere JDK 17; Expo `expo-build-properties` fija Kotlin y compile SDK 37. Implementado abrir EPUB, recuperar/guardar locator estable y progreso en SQLite, y guardar temas y tamaño de texto. Próximo trabajo de fase: probarlo en dispositivo con development build, revisar navegación/TOC y accesibilidad, y añadir marcadores/anotaciones según capacidades.
 
-**Salida:** set de EPUB de prueba con contenido simple/realista y casos límite; libros locales funcionan en modo avión; controles y lector accesibles.
+**Salida:** set de EPUB de prueba con contenido simple/realista y casos límite; libros locales funcionan en modo avión; controles y lector accesibles. Aún no se declara cumplida: requiere verificación nativa en Android.
 
 ## Fase 5 — Catálogo y descargas (2–3 semanas)
 

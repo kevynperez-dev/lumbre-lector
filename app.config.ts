@@ -15,6 +15,15 @@ const config = {
           enableFTS: true,
         },
       ],
+      [
+        'expo-build-properties',
+        {
+          android: {
+            compileSdkVersion: 37,
+            kotlinVersion: '2.3.20',
+          },
+        },
+      ],
     ],
     android: {
       package: 'app.lumbre.reader',

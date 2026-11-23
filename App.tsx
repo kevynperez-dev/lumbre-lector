@@ -10,6 +10,7 @@ import { useColorScheme } from 'nativewind';
 import { migrateDatabase } from './src/database/migrations';
 import type { Publication } from './src/database/types';
 import { importEpub } from './src/features/library/import-epub';
+import { ReaderScreen } from './src/features/reader/ReaderScreen';
 
 type Tab = 'library' | 'discover' | 'settings';
 
@@ -20,6 +21,7 @@ function AppContent() {
   const [books, setBooks] = useState<Publication[]>([]);
   const [isImporting, setIsImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  const [selectedBook, setSelectedBook] = useState<Publication | null>(null);
   const isDark = colorScheme === 'dark';
 
   async function refreshLibrary() {
@@ -63,6 +65,10 @@ function AppContent() {
       isMounted = false;
     };
   }, [database]);
+
+  if (selectedBook) {
+    return <ReaderScreen publication={selectedBook} onClose={() => setSelectedBook(null)} />;
+  }
 
   return (
     <SafeAreaView className={isDark ? 'flex-1 bg-night-canvas' : 'flex-1 bg-paper-canvas'}>
@@ -169,8 +175,11 @@ function AppContent() {
                 ) : (
                   <View className="mt-5 gap-3">
                     {books.map((book) => (
-                      <View
+                      <Pressable
                         key={book.id}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Leer ${book.title}`}
+                        onPress={() => setSelectedBook(book)}
                         className="rounded-2xl border border-paper-line bg-paper-surface p-4 dark:border-night-line dark:bg-night-surface"
                       >
                         <Text className="font-editorial text-xl text-paper-ink dark:text-night-ink">
@@ -179,7 +188,7 @@ function AppContent() {
                         <Text className="mt-1 text-sm text-paper-subtle dark:text-night-subtle">
                           {book.author || 'Autor desconocido'}
                         </Text>
-                      </View>
+                      </Pressable>
                     ))}
                   </View>
                 )}

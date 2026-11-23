@@ -27,4 +27,6 @@ La implementación usa Expo SDK 58, React Native, TypeScript, SQLite y NativeWin
 
 ## Estado
 
-La primera etapa implementa los cimientos Expo, la biblioteca local y el cambio de tema. La biblioteca ya permite importar EPUBs desde el selector de Android, copiar cada archivo al almacenamiento privado de la app y guardar sus metadatos en SQLite. El lector, el catálogo y las descargas desde Internet siguen pendientes.
+La implementación actual permite importar EPUBs desde el selector Android y guardarlos en el almacenamiento privado con metadatos SQLite. También integra el lector nativo Readium: abre los libros locales, recuerda la posición y permite cambiar entre temas papel/sepia/noche y tamaño de letra. El catálogo y las descargas desde Internet siguen pendientes; la lectura nativa debe validarse en un dispositivo/emulador con un development build.
+
+Para el lector se requiere un build nativo Android con JDK 17; Expo Go no incluye este módulo. El proyecto configura Kotlin 2.3.20 y compile SDK 37 mediante `expo-build-properties`.

@@ -23,6 +23,10 @@ Consulta: 23 de noviembre de 2026. Las versiones de SDK, runtime y librerías ca
 ## Lectura digital y derechos
 
 - [Readium Mobile](https://readium.org/mobile/) — toolkit de lectura móvil escrito en Swift/Kotlin; evidencia de que integrarlo en RN puede necesitar puente nativo.
+- [React Native Readium: instalación](https://5-stones.github.io/react-native-readium/docs/getting-started/installation) — licencia, requisitos nativos Android y configuración Expo.
+- [React Native Readium: inicio rápido](https://5-stones.github.io/react-native-readium/docs/getting-started/quick-start) — apertura de publicación local y eventos del lector.
+- [React Native Readium: preferencias](https://5-stones.github.io/react-native-readium/docs/guides/preferences) — temas, tipografía y opciones visuales expuestas por el wrapper.
+- [Readium Kotlin Toolkit](https://github.com/readium/kotlin-toolkit) — implementación nativa Android del motor.
 - [Readium Swift getting started](https://readium.org/swift-toolkit/latest/documentation/readium/getting-started/) — parsing y responsabilidades de app lectora.
 - [Project Gutenberg Terms of Use](https://www.gutenberg.org/policy/terms_of_use.html) — cautela sobre derechos fuera de EE. UU.
 - [Project Gutenberg License](https://www.gutenberg.org/policy/license) — condiciones del proyecto y atribución/redistribución.

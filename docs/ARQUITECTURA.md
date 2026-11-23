@@ -70,7 +70,7 @@ Un libro de Project Gutenberg puede tener condiciones y estatus distintos según
 
 ## Lector y formatos
 
-Definir `PublicationRenderer` con operaciones para abrir, navegar, obtener/guardar locator, índice de contenidos, preferencias, selección/anotación y capacidades. Crear un spike de EPUB en React Native antes de decidir librería: compatibilidad New Architecture, CSS/HTML seguro, accesibilidad, rendimiento, licencias y maintenance. Readium Mobile es nativo Swift/Kotlin; usarlo en RN implica puente nativo y evaluar coste de mantenimiento. No declarar compatibilidad con DRM.
+Se eligió `react-native-readium` 5.3 (MIT), puente React Native sobre Readium Kotlin, como motor EPUB. Acepta publicaciones locales y expone locator, eventos de posición y preferencias de tema/tipografía. Al ser nativo requiere development build Expo; el proyecto configura Kotlin 2.3.20 y compile SDK 37 con `expo-build-properties` (JDK 17 en la máquina de build). Esta elección resuelve el spike inicial; falta validar apertura, TalkBack, memoria y navegación en Android físico/emulador antes de cerrar la fase. No declarar compatibilidad con DRM.
 
 La posición debe usar locator estable (por ejemplo, identificador de recurso + fragmento/progresión/CFI según formato), no solo número de página visual. Los EPUB reflowables cambian paginación al personalizar.
 
@@ -93,3 +93,4 @@ Consultar SQLite a través de casos de uso y capas de caché selectivas. Preferi
 3. **Proveedor desacoplado:** los términos y disponibilidad cambian; la interfaz de dominio no depende de un catálogo.
 4. **EPUB primero:** el texto reflowable satisface personalización básica; otros formatos requieren lectores y pruebas específicos.
 5. **Expo como plataforma:** mantener el flujo Expo para configuración y builds Android; usar development builds y extensiones nativas solo donde el lector o descargas lo requieran.
+6. **Motor EPUB:** `react-native-readium` 5.3, wrapper MIT sobre Readium Kotlin; el locator se persiste como JSON en `reading_positions` y preferencias comunes por dispositivo en `reader_preferences`.
