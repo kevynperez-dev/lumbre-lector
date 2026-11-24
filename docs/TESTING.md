@@ -16,7 +16,7 @@ npm test
 npm run typecheck
 ```
 
-Las unitarias cubren la normalización de Gutendex, filtro conservador por derechos, URL/paginación, origen HTTPS permitido, estructura inicial obligatoria del EPUB, límite de tamaño y aviso legal persistido. Las pruebas de integración ejecutan las migraciones SQL reales con SQLite y comprueban upgrade desde v1, constraints, borrado en cascada y actualización idempotente de preferencias.
+Las unitarias cubren la normalización de Gutendex, filtro conservador por derechos, URL/paginación, origen HTTPS permitido, estructura inicial obligatoria del EPUB, límite de tamaño, aviso legal y flujo de descarga con runtime simulado: éxito, progreso, idempotencia, cancelación, EPUB inválido y fallo al guardar metadatos. Las pruebas de integración ejecutan las migraciones SQL reales con SQLite y comprueban upgrade desde v1, constraints, borrado en cascada y actualización idempotente de preferencias.
 
 ## E2E Android
 
@@ -30,7 +30,7 @@ npm run test:e2e:android
 npm run test:visual:android
 ```
 
-`ANDROID_SERIAL` permite seleccionar un dispositivo concreto. El flujo usa el EPUB de prueba propio de `tests/fixtures`, importa por el selector del sistema, abre el libro con Readium, cambia a sepia y noche, guarda un tamaño de texto y vuelve a abrir el libro sin red. Al salir del lector, el script reactiva Wi‑Fi y datos del emulador. Las capturas se escriben en `/tmp/lumbre-e2e`; se pueden cambiar con `LUMBRE_E2E_ARTIFACTS`.
+`ANDROID_SERIAL` permite seleccionar un dispositivo concreto. El flujo prueba el error recuperable del catálogo sin conexión, importa el EPUB propio de `tests/fixtures` por el selector del sistema, abre con Readium, cambia a sepia y noche, guarda un tamaño de texto y vuelve a abrir el libro sin red. También verifica que el tema general sobrevive al reinicio del proceso y que eliminar un libro pide confirmación y lo quita de la biblioteca. Al salir, el script reactiva Wi‑Fi y datos del emulador. Las capturas se escriben en `/tmp/lumbre-e2e`; se pueden cambiar con `LUMBRE_E2E_ARTIFACTS`.
 
 El chequeo visual toma la zona central del lector en las tres capturas y valida formato vertical y el orden de luminancia papel > sepia > noche. El resultado no reemplaza la inspección visual humana: al revisar una UI hay que comparar también recorte, tipografía, contraste, estados vacíos/error, tamaño de texto y controles TalkBack.
 

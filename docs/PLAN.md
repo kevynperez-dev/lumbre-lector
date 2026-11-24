@@ -34,6 +34,8 @@ Las duraciones son estimaciones relativas para un equipo pequeño y deben recali
 
 **Trabajo:** entidades y errores, esquema versionado, migraciones, repositorios, fixtures legalmente utilizables, biblioteca, colecciones, ajustes y preferencias persistentes; importación local prototipo.
 
+**Implementación verificada:** migraciones SQLite, importación privada EPUB, progreso/posición, ajustes de lectura y tema general persistidos, reconciliación de archivos incompletos o huérfanos y eliminación confirmada de libros con limpieza del archivo local. Falta implementar colecciones, biblioteca ordenable/filtrable y cuotas de almacenamiento.
+
 **Salida:** los datos sobreviven reinicio y migración; pruebas automatizadas de migración/transacciones; borrar la app/copia sigue la política definida.
 
 ## Fase 4 — Lectura EPUB (2–4 semanas)
@@ -54,7 +56,7 @@ Las duraciones son estimaciones relativas para un equipo pequeño y deben recali
 
 **Trabajo:** matriz de dispositivos Android; navegación TalkBack; tamaños grandes, contraste, orientación; libros corruptos/maliciosos, URL hostil, redirecciones, SQL inputs, almacenamiento lleno, interrupciones, regresión visual y rendimiento.
 
-**Automatización añadida y ejecutada:** 16 pruebas unitarias/de integración pasan con SQLite real; E2E en release sobre AVD API 36 verifica importación de EPUB con DocumentsUI, apertura Readium, cambio de papel/sepia/noche, tamaño de letra, persistencia y lectura offline. La revisión visual de capturas 720×1600 y sus guardas de luminancia pasan. Sigue pendiente ampliar TalkBack, corpus de EPUB malformados y compatibilidad en dispositivos físicos.
+**Automatización añadida y ejecutada:** 22 pruebas unitarias/de integración pasan; usan SQLite real para migraciones y persistencia, y un runtime simulado para éxito/error/cancelación de descargas. E2E en release sobre AVD API 36 verifica error recuperable del catálogo offline, importación con DocumentsUI, apertura Readium, cambio de papel/sepia/noche, progreso tipográfico, persistencia de apariencia, eliminación confirmada y reapertura del libro offline. La revisión visual de capturas 720×1600 y sus guardas de luminancia pasan. Sigue pendiente ampliar TalkBack, corpus de EPUB malformados y compatibilidad en dispositivos físicos.
 
 **Salida:** cero defectos bloqueantes conocidos; objetivos de rendimiento documentados; revisión de privacidad, términos y manejo de datos; recuperación probada.
 

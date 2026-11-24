@@ -1,8 +1,9 @@
 import './global.css';
 
-import { useEffect, useState } from 'react';
-import { Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { SQLiteProvider, useSQLiteContext } from 'expo-sqlite';
+import { File } from 'expo-file-system';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useColorScheme } from 'nativewind';
@@ -18,13 +19,71 @@ type Tab = 'library' | 'discover' | 'settings';
 
 function AppContent() {
   const database = useSQLiteContext();
-  const { colorScheme, toggleColorScheme } = useColorScheme();
+  const colorSchemeController = useColorScheme();
+  const { colorScheme } = colorSchemeController;
+  const setColorSchemeRef = useRef(colorSchemeController.setColorScheme);
+  setColorSchemeRef.current = colorSchemeController.setColorScheme;
   const [activeTab, setActiveTab] = useState<Tab>('library');
   const [books, setBooks] = useState<Publication[]>([]);
   const [isImporting, setIsImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [selectedBook, setSelectedBook] = useState<Publication | null>(null);
+  const [libraryError, setLibraryError] = useState<string | null>(null);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
   const isDark = colorScheme === 'dark';
+
+  async function toggleAppearance() {
+    const previous = isDark ? 'dark' : 'light';
+    const next = isDark ? 'light' : 'dark';
+    setSettingsError(null);
+    setColorSchemeRef.current(next);
+    try {
+      await database.runAsync(
+        `INSERT INTO reader_preferences (preference_key, preference_value, updated_at)
+         VALUES ('appearance', ?, CURRENT_TIMESTAMP)
+         ON CONFLICT(preference_key) DO UPDATE SET
+           preference_value = excluded.preference_value,
+           updated_at = CURRENT_TIMESTAMP`,
+        next,
+      );
+    } catch {
+      setColorSchemeRef.current(previous);
+      setSettingsError('No se pudo guardar la apariencia. Inténtalo de nuevo.');
+    }
+  }
+
+  function confirmDelete(book: Publication) {
+    Alert.alert(
+      'Quitar libro',
+      `Se eliminará “${book.title}” y su archivo de este dispositivo.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              setLibraryError(null);
+              try {
+                await database.withTransactionAsync(async () => {
+                  await database.runAsync('DELETE FROM publications WHERE id = ?', book.id);
+                });
+                try {
+                  const file = new File(book.local_uri);
+                  if (file.exists) file.delete();
+                } catch {
+                  // Startup reconciliation removes any unindexed EPUB in the app-owned books folder.
+                }
+                await refreshLibrary();
+              } catch {
+                setLibraryError('No se pudo quitar el libro. Inténtalo de nuevo.');
+              }
+            })();
+          },
+        },
+      ],
+    );
+  }
 
   async function refreshLibrary() {
     const rows = await database.getAllAsync<Publication>(
@@ -53,6 +112,15 @@ function AppContent() {
 
   useEffect(() => {
     let isMounted = true;
+
+    void database.getFirstAsync<{ preference_value: string }>(
+      'SELECT preference_value FROM reader_preferences WHERE preference_key = ?',
+      'appearance',
+    ).then((saved) => {
+      if (isMounted && (saved?.preference_value === 'light' || saved?.preference_value === 'dark')) {
+        setColorSchemeRef.current(saved.preference_value);
+      }
+    }).catch(() => undefined);
 
     async function loadLibrary() {
       try {
@@ -96,7 +164,7 @@ function AppContent() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={isDark ? 'Activar modo claro' : 'Activar modo oscuro'}
-                onPress={toggleColorScheme}
+                onPress={() => void toggleAppearance()}
                 className="h-11 w-11 items-center justify-center rounded-full border border-paper-line dark:border-night-line"
               >
                 <Text className="text-lg text-paper-ink dark:text-night-ink">
@@ -144,6 +212,12 @@ function AppContent() {
                   </View>
                 ) : null}
 
+                {libraryError ? (
+                  <View accessibilityRole="alert" className="mt-4 rounded-xl bg-red-100 px-4 py-3 dark:bg-red-950">
+                    <Text className="text-sm text-red-900 dark:text-red-100">{libraryError}</Text>
+                  </View>
+                ) : null}
+
                 {books.length === 0 ? (
                   <View className="flex-1 items-center justify-center py-12">
                     <View className="mb-7 h-36 w-40 items-center justify-center">
@@ -174,32 +248,40 @@ function AppContent() {
                       className="mt-4 rounded-full px-6 py-3"
                     >
                       <Text className="font-semibold text-paper-green dark:text-night-green">
-                        Explorar catálogo próximamente
+                        Explorar catálogo
                       </Text>
                     </Pressable>
                   </View>
                 ) : (
                   <View className="mt-5 gap-3">
                     {books.map((book) => (
-                      <Pressable
-                        key={book.id}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Leer ${book.title}`}
-                        onPress={() => setSelectedBook(book)}
-                        className="rounded-2xl border border-paper-line bg-paper-surface p-4 dark:border-night-line dark:bg-night-surface"
-                      >
-                        <Text className="font-editorial text-xl text-paper-ink dark:text-night-ink">
-                          {book.title}
-                        </Text>
-                        <Text className="mt-1 text-sm text-paper-subtle dark:text-night-subtle">
-                          {book.author || 'Autor desconocido'}
-                        </Text>
-                        {book.source_name ? (
-                          <Text className="mt-2 text-xs text-paper-green dark:text-night-green">
-                            {book.source_name} · guardado en este dispositivo
+                      <View key={book.id} className="rounded-2xl border border-paper-line bg-paper-surface p-4 dark:border-night-line dark:bg-night-surface">
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={`Leer ${book.title}`}
+                          onPress={() => setSelectedBook(book)}
+                        >
+                          <Text className="font-editorial text-xl text-paper-ink dark:text-night-ink">
+                            {book.title}
                           </Text>
-                        ) : null}
-                      </Pressable>
+                          <Text className="mt-1 text-sm text-paper-subtle dark:text-night-subtle">
+                            {book.author || 'Autor desconocido'}
+                          </Text>
+                          {book.source_name ? (
+                            <Text className="mt-2 text-xs text-paper-green dark:text-night-green">
+                              {book.source_name} · guardado en este dispositivo
+                            </Text>
+                          ) : null}
+                        </Pressable>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={`Eliminar ${book.title} del dispositivo`}
+                          onPress={() => confirmDelete(book)}
+                          className="mt-3 min-h-11 self-start justify-center rounded-full px-3"
+                        >
+                          <Text className="text-sm font-semibold text-red-800 dark:text-red-200">Quitar libro</Text>
+                        </Pressable>
+                      </View>
                     ))}
                   </View>
                 )}
@@ -215,11 +297,16 @@ function AppContent() {
                   A tu manera.
                 </Text>
                 <Text className="mt-4 text-base leading-6 text-paper-subtle dark:text-night-subtle">
-                  Elige el aspecto que te resulte más cómodo. Los ajustes de lectura llegarán junto con el lector.
+                  Elige el aspecto de la aplicación. Las opciones de tipografía, márgenes y color de página están disponibles al abrir un libro.
                 </Text>
+                {settingsError ? (
+                  <View accessibilityRole="alert" className="mt-4 rounded-xl bg-red-100 px-4 py-3 dark:bg-red-950">
+                    <Text className="text-sm text-red-900 dark:text-red-100">{settingsError}</Text>
+                  </View>
+                ) : null}
                 <Pressable
                   accessibilityRole="button"
-                  onPress={toggleColorScheme}
+                  onPress={() => void toggleAppearance()}
                   className="mt-8 flex-row items-center justify-between rounded-2xl border border-paper-line bg-paper-surface p-5 dark:border-night-line dark:bg-night-surface"
                 >
                   <View>

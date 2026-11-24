@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createCatalogUrl, mapCatalogResponse, validateCatalogPageUrl } from '../../src/features/catalog/catalog-api.ts';
+import { createCatalogUrl, getCatalogErrorMessage, mapCatalogResponse, validateCatalogPageUrl } from '../../src/features/catalog/catalog-api.ts';
 
 const book = (overrides: Record<string, unknown> = {}) => ({
   id: 11,
@@ -73,4 +73,10 @@ test('accepts only Gutendex books pagination links', () => {
 
 test('rejects non-object catalog responses', () => {
   assert.throws(() => mapCatalogResponse(null), /respuesta del catálogo/i);
+});
+
+test('shows network failures in clear, recoverable language', () => {
+  assert.match(getCatalogErrorMessage(new Error('fetch failed: UnknownHostException')), /Comprueba tu conexión/);
+  assert.equal(getCatalogErrorMessage(new Error('El catálogo respondió con el código 503.')), 'El catálogo respondió con el código 503.');
+  assert.match(getCatalogErrorMessage('unknown error'), /No se pudo cargar el catálogo/);
 });

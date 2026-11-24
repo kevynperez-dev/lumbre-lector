@@ -132,3 +132,11 @@ export function validateCatalogPageUrl(value: string): string {
   }
   return url.toString();
 }
+
+export function getCatalogErrorMessage(error: unknown): string {
+  if (!(error instanceof Error)) return 'No se pudo cargar el catálogo. Inténtalo de nuevo.';
+  if (/fetch failed|unknownhostexception|unable to resolve host|network request failed|enotfound/i.test(error.message)) {
+    return 'No pudimos conectar con el catálogo. Comprueba tu conexión e inténtalo de nuevo.';
+  }
+  return error.message || 'No se pudo cargar el catálogo. Inténtalo de nuevo.';
+}

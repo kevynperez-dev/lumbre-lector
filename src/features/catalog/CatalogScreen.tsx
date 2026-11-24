@@ -4,6 +4,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 
 import {
   createCatalogUrl,
+  getCatalogErrorMessage,
   mapCatalogResponse,
   validateCatalogPageUrl,
   type CatalogBook,
@@ -59,9 +60,7 @@ export function CatalogScreen({ onDownloaded, isDark }: CatalogScreenProps) {
         setError(
           timedOut
             ? 'La búsqueda tardó demasiado. Comprueba tu conexión e inténtalo de nuevo.'
-            : cause instanceof Error
-              ? cause.message
-              : 'No se pudo cargar el catálogo.',
+            : getCatalogErrorMessage(cause),
         );
       }
     } finally {
@@ -165,6 +164,19 @@ export function CatalogScreen({ onDownloaded, isDark }: CatalogScreenProps) {
         </Pressable>
       </View>
 
+      {error ? (
+        <View accessibilityRole="alert" className="mt-4 rounded-xl bg-red-100 px-4 py-3 dark:bg-red-950">
+          <Text className="text-sm leading-5 text-red-900 dark:text-red-100">{error}</Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => void loadCatalog(createCatalogUrl(searchText))}
+            className="mt-3 self-start rounded-full px-2 py-1"
+          >
+            <Text className="font-semibold text-red-900 dark:text-red-100">Intentar de nuevo</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
       <View className={`mt-5 flex-row items-center rounded-2xl border px-4 ${surface}`}>
         <TextInput
           accessibilityLabel="Buscar por título o autor"
@@ -195,19 +207,6 @@ export function CatalogScreen({ onDownloaded, isDark }: CatalogScreenProps) {
         </Text>
         {isLoading ? <ActivityIndicator accessibilityLabel="Buscando libros" color={isDark ? '#A6C7A8' : '#315B4B'} /> : null}
       </View>
-
-      {error ? (
-        <View accessibilityRole="alert" className="mt-4 rounded-xl bg-red-100 px-4 py-3 dark:bg-red-950">
-          <Text className="text-sm leading-5 text-red-900 dark:text-red-100">{error}</Text>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => void loadCatalog(createCatalogUrl(searchText))}
-            className="mt-3 self-start rounded-full px-2 py-1"
-          >
-            <Text className="font-semibold text-red-900 dark:text-red-100">Intentar de nuevo</Text>
-          </Pressable>
-        </View>
-      ) : null}
 
       {!noticeAccepted ? (
         <Text className={`mt-5 text-sm ${subtle}`}>

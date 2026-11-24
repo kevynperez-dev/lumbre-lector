@@ -1,7 +1,7 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-/** Cleans abandoned catalog transfers without touching user-imported documents. */
+/** Cleans interrupted transfers and orphan EPUBs from the app-owned books folder. */
 export async function reconcileBookFiles(database: SQLiteDatabase): Promise<void> {
   const directory = new Directory(Paths.document, 'books');
   if (!directory.exists) return;
@@ -14,10 +14,7 @@ export async function reconcileBookFiles(database: SQLiteDatabase): Promise<void
   for (const entry of directory.list()) {
     if (!(entry instanceof File)) continue;
     const abandonedTransfer = entry.name.endsWith('.part');
-    const orphanedCatalogBook =
-      entry.name.startsWith('gutenberg-') &&
-      entry.name.endsWith('.epub') &&
-      !indexedUris.has(entry.uri);
-    if (abandonedTransfer || orphanedCatalogBook) entry.delete();
+    const orphanedBook = entry.name.endsWith('.epub') && !indexedUris.has(entry.uri);
+    if (abandonedTransfer || orphanedBook) entry.delete();
   }
 }
