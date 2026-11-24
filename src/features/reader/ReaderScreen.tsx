@@ -8,6 +8,7 @@ import { StatusBar } from 'expo-status-bar';
 
 import type { Annotation, Bookmark, Publication } from '../../database/types';
 import { createAnnotation } from './annotation-core';
+import { readerPreferenceKey, selectReaderPreferenceValue } from './reader-preferences';
 
 type ReaderTheme = NonNullable<Preferences['theme']>;
 
@@ -120,10 +121,18 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
     let isMounted = true;
 
     async function loadReaderState() {
-      const [position, savedPreferences, savedBookmarks, savedAnnotations] = await Promise.all([
+      const [position, bookPreferences, defaultPreferences, legacyPreferences, savedBookmarks, savedAnnotations] = await Promise.all([
         database.getFirstAsync<{ locator_json: string }>(
           'SELECT locator_json FROM reading_positions WHERE publication_id = ?',
           publication.id,
+        ),
+        database.getFirstAsync<{ preference_value: string }>(
+          'SELECT preference_value FROM reader_preferences WHERE preference_key = ?',
+          readerPreferenceKey(publication.id),
+        ),
+        database.getFirstAsync<{ preference_value: string }>(
+          'SELECT preference_value FROM reader_preferences WHERE preference_key = ?',
+          'reader:default',
         ),
         database.getFirstAsync<{ preference_value: string }>(
           'SELECT preference_value FROM reader_preferences WHERE preference_key = ?',
@@ -154,11 +163,16 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
       setBookmarks(savedBookmarks);
       setAnnotations(savedAnnotations);
 
-      if (savedPreferences?.preference_value) {
+      const preferenceValue = selectReaderPreferenceValue(
+        bookPreferences?.preference_value,
+        defaultPreferences?.preference_value,
+        legacyPreferences?.preference_value,
+      );
+      if (preferenceValue) {
         try {
           setPreferences((current) => ({
             ...current,
-            ...(JSON.parse(savedPreferences.preference_value) as Preferences),
+            ...(JSON.parse(preferenceValue) as Preferences),
           }));
         } catch {
           setPreferences((current) => current);
@@ -232,10 +246,11 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
     setPreferences(nextPreferences);
     await database.runAsync(
       `INSERT INTO reader_preferences (preference_key, preference_value, updated_at)
-       VALUES ('reader', ?, CURRENT_TIMESTAMP)
+       VALUES (?, ?, CURRENT_TIMESTAMP)
        ON CONFLICT(preference_key) DO UPDATE SET
          preference_value = excluded.preference_value,
          updated_at = CURRENT_TIMESTAMP`,
+      readerPreferenceKey(publication.id),
       JSON.stringify(nextPreferences),
     );
   }

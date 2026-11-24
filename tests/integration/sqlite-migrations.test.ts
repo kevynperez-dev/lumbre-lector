@@ -93,6 +93,21 @@ test('persists reader preferences through conflict updates', () => {
   database.close();
 });
 
+test('keeps reader preferences scoped to each publication', () => {
+  const database = new DatabaseSync(':memory:');
+  migrate(database);
+  const save = database.prepare(`
+    INSERT INTO reader_preferences (preference_key, preference_value)
+    VALUES (?, ?)
+    ON CONFLICT(preference_key) DO UPDATE SET preference_value = excluded.preference_value
+  `);
+  save.run('reader:book-a', '{"theme":"sepia"}');
+  save.run('reader:book-b', '{"theme":"dark"}');
+  assert.equal(database.prepare('SELECT preference_value FROM reader_preferences WHERE preference_key = ?').get('reader:book-a')?.preference_value, '{"theme":"sepia"}');
+  assert.equal(database.prepare('SELECT preference_value FROM reader_preferences WHERE preference_key = ?').get('reader:book-b')?.preference_value, '{"theme":"dark"}');
+  database.close();
+});
+
 test('persists and advances a locator with its reading progression', () => {
   const database = new DatabaseSync(':memory:');
   migrate(database);
