@@ -93,4 +93,4 @@ Consultar SQLite a través de casos de uso y capas de caché selectivas. Preferi
 3. **Proveedor desacoplado:** los términos y disponibilidad cambian; la interfaz de dominio no depende de un catálogo.
 4. **EPUB primero:** el texto reflowable satisface personalización básica; otros formatos requieren lectores y pruebas específicos.
 5. **Expo como plataforma:** mantener el flujo Expo para configuración y builds Android; usar development builds y extensiones nativas solo donde el lector o descargas lo requieran.
-6. **Motor EPUB:** `react-native-readium` 5.3, wrapper MIT sobre Readium Kotlin; el locator se persiste como JSON en `reading_positions` y preferencias comunes por dispositivo en `reader_preferences`.
+6. **Motor EPUB:** `react-native-readium` 5.3, wrapper MIT sobre Readium Kotlin; el locator se persiste como JSON en `reading_positions`. `reader_preferences` conserva ajustes visuales por publicación, con valores globales anteriores como compatibilidad durante la migración.

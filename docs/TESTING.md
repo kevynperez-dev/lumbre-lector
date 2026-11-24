@@ -44,4 +44,4 @@ El chequeo visual toma la zona central del lector en las tres capturas y valida 
 
 ## Regla de aceptación
 
-Una etapa no se marca como terminada mientras su set correspondiente no pase en un build Android, el APK no abra las tareas afectadas y cualquier limitación de red o dispositivo quede explícita en el plan. Los screenshots de diagnóstico no incluyen libros personales y no se añaden a Git automáticamente.
+La suite unitaria y de integración se ejecuta durante la implementación. La aceptación con APK, E2E y revisión visual se agrupa al final del trabajo de implementación; en esa pasada deben ejecutarse los flujos afectados y registrarse fallos, capturas y limitaciones de red o dispositivo en el plan. Los screenshots de diagnóstico no incluyen libros personales y no se añaden a Git automáticamente.
