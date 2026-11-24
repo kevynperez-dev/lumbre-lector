@@ -43,12 +43,33 @@ test('requires the uncompressed mimetype entry at the start of an EPUB ZIP', () 
   assert.equal(isEpubContainerHeader(wrongMediaType), false);
 });
 
-test('allows HTTPS EPUB downloads only from Project Gutenberg hosts', () => {
-  assert.equal(getDownloadUrl(validBook), validBook.epubUrl);
+test('uses the official Project Gutenberg mirror and verifies ebook identifiers', () => {
+  assert.equal(getDownloadUrl(validBook), 'https://gutenberg.pglaf.org/cache/epub/11/pg11.epub');
+  assert.equal(getDownloadUrl({
+    ...validBook,
+    epubUrl: 'https://www.gutenberg.org/ebooks/1342.epub.images',
+    id: 1342,
+  }), 'https://gutenberg.pglaf.org/cache/epub/1342/pg1342-images.epub');
   assert.throws(() => getDownloadUrl({ ...validBook, epubUrl: null }));
   assert.throws(() => getDownloadUrl({ ...validBook, epubUrl: 'http://www.gutenberg.org/book.epub' }));
   assert.throws(() => getDownloadUrl({ ...validBook, epubUrl: 'https://evil.example/book.epub' }));
   assert.throws(() => getDownloadUrl({ ...validBook, epubUrl: 'https://www.gutenberg.org/ebooks/11' }));
+  assert.throws(() => getDownloadUrl({ ...validBook, epubUrl: 'https://www.gutenberg.org/ebooks/12.epub.images' }));
+});
+
+test('accepts Archive.org EPUB URLs only for a matching Open Library identifier', () => {
+  const openLibraryBook: CatalogBook = {
+    ...validBook,
+    id: 25,
+    publicationId: 'openlibrary-OL25M',
+    sourceName: 'Open Library',
+    archiveIdentifier: 'public-book',
+    epubUrl: 'https://archive.org/download/public-book/public-book.epub',
+  };
+  assert.equal(getDownloadUrl(openLibraryBook), openLibraryBook.epubUrl);
+  assert.throws(() => getDownloadUrl({ ...openLibraryBook, epubUrl: 'https://archive.org/download/other/other.epub' }));
+  assert.throws(() => getDownloadUrl({ ...openLibraryBook, epubUrl: 'https://evil.example/download/public-book/public-book.epub' }));
+  assert.throws(() => getDownloadUrl({ ...openLibraryBook, sourceName: 'Project Gutenberg' }));
 });
 
 test('records source and territory limitation with each downloaded title', () => {

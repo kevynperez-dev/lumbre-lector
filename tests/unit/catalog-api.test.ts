@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createCatalogUrl, downloadedCatalogIds, getCatalogErrorMessage, mapCatalogResponse, validateCatalogPageUrl } from '../../src/features/catalog/catalog-api.ts';
+import { createCatalogUrl, createOpenLibrarySearchUrls, downloadedCatalogIds, getCatalogErrorMessage, mapCatalogResponse, mapOpenLibraryResponse, validateCatalogPageUrl } from '../../src/features/catalog/catalog-api.ts';
 
 const book = (overrides: Record<string, unknown> = {}) => ({
   id: 11,
@@ -69,6 +69,66 @@ test('adds validated language and encoded subject filters to catalog searches', 
   assert.equal(allLanguages.searchParams.has('languages'), false);
   const invalidLanguage = new URL(createCatalogUrl('', 1, { language: '../' }));
   assert.equal(invalidLanguage.searchParams.get('languages'), 'es');
+});
+
+test('builds Open Library fallback searches for titles and a likely author suffix', () => {
+  const urls = createOpenLibrarySearchUrls('hábitos atómicos de James Claire').map((value) => new URL(value));
+  assert.equal(urls[0].searchParams.get('q'), 'hábitos atómicos de James Claire');
+  assert.equal(urls[1].searchParams.get('title'), 'Atomic Habits');
+  assert.ok(urls.some((url) => url.searchParams.get('title') === 'hábitos atómicos'));
+  assert.ok(urls.every((url) => url.origin === 'https://openlibrary.org'));
+  assert.ok(urls.every((url) => url.searchParams.get('limit') === '8'));
+});
+
+test('maps Open Library discovery metadata without granting a download right', () => {
+  const books = mapOpenLibraryResponse({ docs: [
+    { key: '/works/OL17930368W', title: 'Atomic Habits', author_name: ['James Clear'], first_publish_year: 2016, ebook_access: 'printdisabled' },
+    { key: '/works/OL9766728W', title: 'La Ley Universal de La Atracción', author_name: ['Teresa Pimentel'], ebook_access: 'no_ebook' },
+    { key: '/works/OL1W/../../evil', title: 'Injected URL', ebook_access: 'public' },
+    { key: '/works/OL2W', title: 'Unknown access', ebook_access: 'unknown' },
+    null,
+  ] });
+
+  assert.equal(books.length, 3);
+  assert.deepEqual(books[0], {
+    key: '/works/OL17930368W',
+    title: 'Atomic Habits',
+    authors: ['James Clear'],
+    firstPublishYear: 2016,
+    access: 'printdisabled',
+    url: 'https://openlibrary.org/works/OL17930368W',
+    downloadableBook: null,
+  });
+  assert.equal(books[1].access, 'no_ebook');
+  assert.equal(books[2].access, 'no_ebook');
+  assert.throws(() => mapOpenLibraryResponse({ docs: 'not an array' }), /Open Library/i);
+});
+
+test('only exposes an Open Library download for a public edition with a safe Archive identifier', () => {
+  const [publicBook, unsafeBook, printDisabled] = mapOpenLibraryResponse({ docs: [
+    {
+      key: '/works/OL66554W', title: 'Pride and Prejudice', author_name: ['Jane Austen'],
+      ebook_access: 'public', editions: { docs: [
+        { key: '/books/OL50444320M', ebook_access: 'public', ia: ['bwb_KS-179-237'] },
+      ] },
+    },
+    {
+      key: '/works/OL4W', title: 'Unsafe identifier', ebook_access: 'public', editions: { docs: [
+        { key: '/books/OL4M', ebook_access: 'public', ia: ['../secret'] },
+      ] },
+    },
+    {
+      key: '/works/OL5W', title: 'Restricted edition', ebook_access: 'printdisabled', editions: { docs: [
+        { key: '/books/OL5M', ebook_access: 'printdisabled', ia: ['restricted-book'] },
+      ] },
+    },
+  ] });
+
+  assert.equal(publicBook.downloadableBook?.sourceName, 'Open Library');
+  assert.equal(publicBook.downloadableBook?.archiveIdentifier, 'bwb_KS-179-237');
+  assert.equal(publicBook.downloadableBook?.epubUrl, 'https://archive.org/download/bwb_KS-179-237/bwb_KS-179-237.epub');
+  assert.equal(unsafeBook.downloadableBook, null);
+  assert.equal(printDisabled.downloadableBook, null);
 });
 
 test('restores downloaded catalog ids from persisted Gutenberg publications', () => {

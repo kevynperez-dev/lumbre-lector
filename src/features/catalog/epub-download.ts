@@ -4,6 +4,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import type { CatalogBook } from './catalog-api';
 import {
   downloadEpub,
+  resolveArchiveEpubUrl,
   type DownloadFile,
   type EpubDownloadRuntime,
 } from './epub-download-core';
@@ -34,6 +35,24 @@ class NativeDownloadFile implements DownloadFile {
   delete(): void {
     this.native.delete();
   }
+}
+
+export async function resolveOpenLibraryEpub(
+  book: CatalogBook,
+  signal: AbortSignal,
+): Promise<CatalogBook> {
+  if (book.sourceName !== 'Open Library') return book;
+  const identifier = book.archiveIdentifier;
+  if (!identifier || !/^[A-Za-z0-9._-]+$/.test(identifier)) {
+    throw new Error('Open Library no proporcionó un archivo EPUB público verificable.');
+  }
+
+  const response = await fetch(`https://archive.org/metadata/${encodeURIComponent(identifier)}`, {
+    headers: { Accept: 'application/json' },
+    signal,
+  });
+  if (!response.ok) throw new Error(`Internet Archive respondió con el código ${response.status}.`);
+  return resolveArchiveEpubUrl(book, await response.json());
 }
 
 function nativeFile(file: DownloadFile): File {
@@ -82,12 +101,13 @@ export async function downloadBook(
         await database.runAsync(
           `INSERT INTO publications
             (id, title, author, language, format, local_uri, source_name, rights_notice, file_size)
-           VALUES (?, ?, ?, ?, 'epub', ?, 'Project Gutenberg', ?, ?)`,
+           VALUES (?, ?, ?, ?, 'epub', ?, ?, ?, ?)`,
           id,
           selectedBook.title,
           selectedBook.author,
           selectedBook.language,
           localUri,
+          selectedBook.sourceName ?? 'Project Gutenberg',
           rightsNotice,
           fileSize,
         );

@@ -1,17 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 
 import {
   createCatalogUrl,
-  downloadedCatalogIds,
+  createOpenLibrarySearchUrls,
   getCatalogErrorMessage,
+  mapOpenLibraryResponse,
   mapCatalogResponse,
   validateCatalogPageUrl,
   type CatalogFilters,
   type CatalogBook,
+  type OpenLibraryBook,
 } from './catalog-api';
-import { downloadBook } from './epub-download';
+import { downloadBook, resolveOpenLibraryEpub } from './epub-download';
 
 type CatalogScreenProps = {
   onDownloaded: () => Promise<void>;
@@ -30,24 +32,48 @@ const LANGUAGE_OPTIONS = [
   { code: 'all', label: 'Todos' },
 ];
 
+async function searchOpenLibrary(query: string, signal: AbortSignal): Promise<OpenLibraryBook[]> {
+  const matches = new Map<string, OpenLibraryBook>();
+  const requests = await Promise.allSettled(createOpenLibrarySearchUrls(query).map(async (url) => {
+    const response = await fetch(url, { headers: { Accept: 'application/json' }, signal });
+    if (!response.ok) throw new Error(`Open Library respondió con el código ${response.status}.`);
+    return mapOpenLibraryResponse(await response.json());
+  }));
+  for (const request of requests) {
+    if (request.status === 'fulfilled') {
+      for (const match of request.value) matches.set(match.key, match);
+    }
+  }
+  if (matches.size === 0 && requests.every((request) => request.status === 'rejected')) {
+    throw requests[0].status === 'rejected' ? requests[0].reason : new Error('Open Library no devolvió resultados.');
+  }
+  return [...matches.values()];
+}
+
 export function CatalogScreen({ onDownloaded, isDark }: CatalogScreenProps) {
   const database = useSQLiteContext();
   const [searchText, setSearchText] = useState('');
   const [topicText, setTopicText] = useState('');
   const [authorFilter, setAuthorFilter] = useState('');
   const [language, setLanguage] = useState('es');
+  const [languageWasChosen, setLanguageWasChosen] = useState(false);
   const [query, setQuery] = useState('');
   const [books, setBooks] = useState<CatalogBook[]>([]);
+  const [openLibraryBooks, setOpenLibraryBooks] = useState<OpenLibraryBook[]>([]);
   const [next, setNext] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [downloads, setDownloads] = useState<Record<number, DownloadState>>({});
-  const [downloadErrors, setDownloadErrors] = useState<Record<number, string>>({});
-  const [downloadedIds, setDownloadedIds] = useState<number[]>([]);
+  const [downloads, setDownloads] = useState<Record<string, DownloadState>>({});
+  const [downloadErrors, setDownloadErrors] = useState<Record<string, string>>({});
+  const [downloadedIds, setDownloadedIds] = useState<string[]>([]);
   const [noticeAccepted, setNoticeAccepted] = useState(false);
   const activeRequest = useRef<AbortController | null>(null);
+  const fallbackRequest = useRef<AbortController | null>(null);
   const visibleBooks = books.filter((book) =>
     book.author.toLocaleLowerCase().includes(authorFilter.trim().toLocaleLowerCase()),
+  );
+  const visibleOpenLibraryBooks = openLibraryBooks.filter((book) =>
+    book.authors.join(', ').toLocaleLowerCase().includes(authorFilter.trim().toLocaleLowerCase()),
   );
 
   function currentFilters(): CatalogFilters {
@@ -55,7 +81,13 @@ export function CatalogScreen({ onDownloaded, isDark }: CatalogScreenProps) {
   }
 
   function searchCatalog() {
-    if (noticeAccepted) void loadCatalog(createCatalogUrl(searchText, 1, currentFilters()));
+    if (!noticeAccepted) return;
+    const filters = currentFilters();
+    if (searchText.trim() && language === 'es' && !languageWasChosen) {
+      filters.language = 'all';
+      setLanguage('all');
+    }
+    void loadCatalog(createCatalogUrl(searchText, 1, filters));
   }
 
   function retryCatalog() {
@@ -65,20 +97,22 @@ export function CatalogScreen({ onDownloaded, isDark }: CatalogScreenProps) {
 
   useEffect(() => {
     let isMounted = true;
-    void database.getAllAsync<{ id: string }>(
-      "SELECT id FROM publications WHERE source_name = 'Project Gutenberg'",
-    ).then((rows) => {
-      if (isMounted) setDownloadedIds(downloadedCatalogIds(rows.map(({ id }) => id)));
+    void database.getAllAsync<{ id: string }>('SELECT id FROM publications').then((rows) => {
+      if (isMounted) setDownloadedIds(rows.map(({ id }) => id));
     }).catch(() => undefined);
     return () => { isMounted = false; };
   }, [database]);
 
   async function loadCatalog(url: string, append = false, requestedQuery = searchText.trim()) {
     activeRequest.current?.abort();
+    fallbackRequest.current?.abort();
     const controller = new AbortController();
     activeRequest.current = controller;
+    const fallbackController = new AbortController();
+    fallbackRequest.current = fallbackController;
     if (!append) {
       setBooks([]);
+      setOpenLibraryBooks([]);
       setNext(null);
     }
     setIsLoading(true);
@@ -89,6 +123,23 @@ export function CatalogScreen({ onDownloaded, isDark }: CatalogScreenProps) {
       timedOut = true;
       controller.abort('timeout');
     }, 15_000);
+    const fallbackTimeout = setTimeout(() => fallbackController.abort('timeout'), 30_000);
+    const openLibraryLookup = !append
+      ? searchOpenLibrary(requestedQuery, fallbackController.signal)
+      : Promise.resolve([] as OpenLibraryBook[]);
+    void openLibraryLookup.then(
+      () => clearTimeout(fallbackTimeout),
+      () => clearTimeout(fallbackTimeout),
+    );
+    void openLibraryLookup.then((matches) => {
+      if (fallbackRequest.current === fallbackController && matches.length > 0) {
+        setOpenLibraryBooks(matches);
+        setQuery(requestedQuery);
+        setNext(null);
+        setError(null);
+        setIsLoading(false);
+      }
+    }).catch(() => undefined);
     try {
       const response = await fetch(url, {
         headers: { Accept: 'application/json' },
@@ -102,11 +153,19 @@ export function CatalogScreen({ onDownloaded, isDark }: CatalogScreenProps) {
       setQuery(requestedQuery);
     } catch (cause) {
       if (activeRequest.current === controller) {
-        setError(
-          timedOut
-            ? 'La búsqueda tardó demasiado. Comprueba tu conexión e inténtalo de nuevo.'
-            : getCatalogErrorMessage(cause),
-        );
+        const alternativeMatches = await openLibraryLookup.catch(() => [] as OpenLibraryBook[]);
+        if (alternativeMatches.length > 0) {
+          setOpenLibraryBooks(alternativeMatches);
+          setQuery(requestedQuery);
+          setNext(null);
+          setError(null);
+        } else {
+          setError(
+            timedOut
+              ? 'La búsqueda tardó demasiado. Prueba de nuevo o revisa la conexión.'
+              : getCatalogErrorMessage(cause),
+          );
+        }
       }
     } finally {
       clearTimeout(timeout);
@@ -122,15 +181,17 @@ export function CatalogScreen({ onDownloaded, isDark }: CatalogScreenProps) {
     void loadCatalog(createCatalogUrl(''));
     return () => {
       activeRequest.current?.abort();
+      fallbackRequest.current?.abort();
     };
   }, [noticeAccepted]);
 
   async function startDownload(book: CatalogBook) {
-    if (downloads[book.id]) {
-      downloads[book.id].controller.abort();
+    const downloadKey = book.publicationId ?? `gutenberg-${book.id}`;
+    if (downloads[downloadKey]) {
+      downloads[downloadKey].controller.abort();
       setDownloads((current) => {
         const updated = { ...current };
-        delete updated[book.id];
+        delete updated[downloadKey];
         return updated;
       });
       return;
@@ -139,25 +200,26 @@ export function CatalogScreen({ onDownloaded, isDark }: CatalogScreenProps) {
     const controller = new AbortController();
     setDownloadErrors((current) => {
       const updated = { ...current };
-      delete updated[book.id];
+      delete updated[downloadKey];
       return updated;
     });
-    setDownloads((current) => ({ ...current, [book.id]: { progress: null, controller } }));
+    setDownloads((current) => ({ ...current, [downloadKey]: { progress: null, controller } }));
     try {
-      const result = await downloadBook(database, book, controller.signal, (progress) => {
+      const resolvedBook = await resolveOpenLibraryEpub(book, controller.signal);
+      const result = await downloadBook(database, resolvedBook, controller.signal, (progress) => {
         setDownloads((current) =>
-          current[book.id]
-            ? { ...current, [book.id]: { ...current[book.id], progress } }
+          current[downloadKey]
+            ? { ...current, [downloadKey]: { ...current[downloadKey], progress } }
             : current,
         );
       });
-      setDownloadedIds((current) => [...new Set([...current, book.id])]);
+      setDownloadedIds((current) => [...new Set([...current, downloadKey])]);
       if (result === 'downloaded') await onDownloaded();
     } catch (cause) {
       if (!controller.signal.aborted) {
         setDownloadErrors((current) => ({
           ...current,
-          [book.id]: cause instanceof Error
+          [downloadKey]: cause instanceof Error
             ? cause.message
             : 'No se pudo descargar el libro. Comprueba tu conexión e inténtalo otra vez.',
         }));
@@ -165,7 +227,7 @@ export function CatalogScreen({ onDownloaded, isDark }: CatalogScreenProps) {
     } finally {
       setDownloads((current) => {
         const updated = { ...current };
-        delete updated[book.id];
+        delete updated[downloadKey];
         return updated;
       });
     }
@@ -256,7 +318,10 @@ export function CatalogScreen({ onDownloaded, isDark }: CatalogScreenProps) {
                 key={option.code}
                 accessibilityRole="tab"
                 accessibilityState={{ selected }}
-                onPress={() => setLanguage(option.code)}
+                onPress={() => {
+                  setLanguage(option.code);
+                  setLanguageWasChosen(true);
+                }}
                 className={`rounded-full border px-4 py-2 ${selected ? (isDark ? 'border-night-green bg-night-green' : 'border-paper-green bg-paper-green') : (isDark ? 'border-night-line bg-night-surface' : 'border-paper-line bg-paper-surface')}`}
               >
                 <Text className={`text-xs font-semibold ${selected ? (isDark ? 'text-night-canvas' : 'text-white') : ink}`}>
@@ -305,7 +370,7 @@ export function CatalogScreen({ onDownloaded, isDark }: CatalogScreenProps) {
         </Text>
       ) : null}
 
-      {visibleBooks.length === 0 && !isLoading && !error ? (
+      {visibleBooks.length === 0 && visibleOpenLibraryBooks.length === 0 && !isLoading && !error ? (
         <Text className={`mt-5 text-base leading-6 ${subtle}`}>
           {books.length > 0
             ? 'Ningún resultado cargado coincide con este autor.'
@@ -315,8 +380,9 @@ export function CatalogScreen({ onDownloaded, isDark }: CatalogScreenProps) {
 
       <View className="mt-4 gap-3">
         {visibleBooks.map((book) => {
-          const download = downloads[book.id];
-          const isDownloaded = downloadedIds.includes(book.id);
+          const publicationId = book.publicationId ?? `gutenberg-${book.id}`;
+          const download = downloads[publicationId];
+          const isDownloaded = downloadedIds.includes(publicationId);
           return (
             <View key={book.id} className={`rounded-2xl border p-4 ${surface}`}>
               <Text className={`font-editorial text-xl leading-7 ${ink}`}>{book.title}</Text>
@@ -346,10 +412,10 @@ export function CatalogScreen({ onDownloaded, isDark }: CatalogScreenProps) {
                   </Text>
                 </Pressable>
               </View>
-              {downloadErrors[book.id] ? (
+              {downloadErrors[publicationId] ? (
                 <View accessibilityRole="alert" className="mt-3 rounded-xl bg-red-100 px-3 py-2 dark:bg-red-950">
                   <Text className="text-xs leading-5 text-red-900 dark:text-red-100">
-                    {downloadErrors[book.id]}
+                    {downloadErrors[publicationId]}
                   </Text>
                   <Pressable
                     accessibilityRole="button"
@@ -364,6 +430,72 @@ export function CatalogScreen({ onDownloaded, isDark }: CatalogScreenProps) {
           );
         })}
       </View>
+
+      {visibleOpenLibraryBooks.length > 0 ? (
+        <View className="mt-7">
+          <Text className={`mb-2 font-editorial text-2xl ${ink}`}>
+            Más coincidencias · Open Library
+          </Text>
+          <Text className={`mb-3 text-xs leading-5 ${subtle}`}>
+            Este catálogo ayuda a localizar títulos que no están en Project Gutenberg. Solo se habilita la descarga interna si Open Library y el registro del archivo confirman acceso público y un EPUB disponible.
+          </Text>
+          <View className="gap-3">
+            {visibleOpenLibraryBooks.map((book) => {
+              const downloadable = book.downloadableBook;
+              const publicationId = downloadable?.publicationId ?? '';
+              const download = downloadable ? downloads[downloadable.publicationId ?? `gutenberg-${downloadable.id}`] : undefined;
+              const isDownloaded = publicationId ? downloadedIds.includes(publicationId) : false;
+              const availability = {
+                public: downloadable ? 'Acceso público indicado; se verificará el EPUB al descargar' : 'Acceso público indicado; no hay EPUB verificable',
+                borrowable: 'Préstamo digital indicado por Open Library',
+                printdisabled: 'Acceso para impresión; sin descarga EPUB',
+                no_ebook: 'Sin ebook disponible en este registro',
+              }[book.access];
+              return (
+                <View key={book.key} className={`rounded-2xl border p-4 ${surface}`}>
+                  <Text className={`font-editorial text-xl leading-7 ${ink}`}>{book.title}</Text>
+                  <Text className={`mt-1 text-sm ${subtle}`}>
+                    {book.authors.join(', ') || 'Autor desconocido'}
+                    {book.firstPublishYear ? ` · ${book.firstPublishYear}` : ''}
+                  </Text>
+                  <Text className={`mt-3 text-xs leading-5 ${subtle}`}>{availability}</Text>
+                  <View className="mt-3 flex-row flex-wrap items-center gap-2">
+                    {downloadable ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={download ? `Cancelar descarga de ${book.title}` : isDownloaded ? `${book.title} descargado` : `Descargar ${book.title}`}
+                        disabled={isDownloaded && !download}
+                        onPress={() => void startDownload(downloadable)}
+                        className={`min-h-11 justify-center rounded-full px-4 ${isDownloaded ? 'bg-paper-muted dark:bg-night-muted' : 'bg-paper-green dark:bg-night-green'}`}
+                      >
+                        <Text className={`text-sm font-semibold ${isDownloaded ? subtle : 'text-white dark:text-night-canvas'}`}>
+                          {download ? download.progress === null ? 'Cancelar' : `${Math.round(download.progress * 100)}% · Cancelar` : isDownloaded ? 'Descargado' : 'Descargar EPUB'}
+                        </Text>
+                      </Pressable>
+                    ) : null}
+                    <Pressable
+                      accessibilityRole="link"
+                      accessibilityLabel={`Consultar ${book.title} en Open Library`}
+                      onPress={() => void Linking.openURL(book.url)}
+                      className={`min-h-11 justify-center rounded-full border px-4 ${surface}`}
+                    >
+                      <Text className={`text-sm font-semibold ${green}`}>Consultar disponibilidad</Text>
+                    </Pressable>
+                  </View>
+                  {publicationId && downloadErrors[publicationId] ? (
+                    <View accessibilityRole="alert" className="mt-3 rounded-xl bg-red-100 px-3 py-2 dark:bg-red-950">
+                      <Text className="text-xs leading-5 text-red-900 dark:text-red-100">{downloadErrors[publicationId]}</Text>
+                      <Pressable accessibilityRole="button" onPress={() => void startDownload(downloadable!)} className="mt-2 self-start rounded-full px-2 py-1">
+                        <Text className="text-xs font-semibold text-red-900 dark:text-red-100">Reintentar descarga</Text>
+                      </Pressable>
+                    </View>
+                  ) : null}
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      ) : null}
 
       {next && noticeAccepted ? (
         <Pressable

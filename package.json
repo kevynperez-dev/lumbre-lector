@@ -33,6 +33,7 @@
     "typecheck": "tsc --noEmit && tsc -p tsconfig.tests.json",
     "test": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/unit/*.test.ts tests/integration/*.test.ts",
     "test:e2e:android": "bash scripts/e2e-android.sh",
+    "test:e2e:catalog:android": "bash scripts/e2e-catalog-android.sh",
     "test:visual:android": "python3 scripts/visual-test.py"
   },
   "private": true

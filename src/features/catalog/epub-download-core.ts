@@ -36,13 +36,59 @@ export type EpubDownloadRuntime = {
   ): Promise<void>;
 };
 
+export function resolveArchiveEpubUrl(
+  book: CatalogBook,
+  payload: unknown,
+): CatalogBook {
+  if (book.sourceName !== 'Open Library') return book;
+  const identifier = book.archiveIdentifier;
+  if (!identifier || !/^[A-Za-z0-9._-]+$/.test(identifier)) {
+    throw new Error('Open Library no proporcionó un archivo EPUB público verificable.');
+  }
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Internet Archive devolvió metadatos no válidos.');
+  }
+  const metadata = (payload as { metadata?: unknown }).metadata;
+  const restricted = metadata && typeof metadata === 'object'
+    ? (metadata as Record<string, unknown>)['access-restricted-item']
+    : undefined;
+  if (restricted === true || restricted === 'true') {
+    throw new Error('Este ebook está restringido y no se descargó.');
+  }
+  const files = (payload as { files?: unknown }).files;
+  if (!Array.isArray(files)) throw new Error('Internet Archive no publicó la lista de archivos.');
+
+  const epub = files.find((value) => {
+    if (!value || typeof value !== 'object') return false;
+    const file = value as Record<string, unknown>;
+    return typeof file.name === 'string' &&
+      file.name.toLowerCase().endsWith('.epub') &&
+      !file.name.includes('/') && !file.name.includes('\\') &&
+      !/[\u0000-\u001f]/.test(file.name) &&
+      file.format === 'EPUB' &&
+      !file.name.toLowerCase().includes('_lcp');
+  }) as Record<string, unknown> | undefined;
+  if (!epub || typeof epub.name !== 'string') {
+    throw new Error('Este registro público no ofrece un EPUB descargable.');
+  }
+  const size = Number(epub.size);
+  if (Number.isFinite(size) && size > MAX_EPUB_SIZE) {
+    throw new Error('El archivo descargado supera el límite de 100 MB.');
+  }
+
+  return {
+    ...book,
+    epubUrl: `https://archive.org/download/${encodeURIComponent(identifier)}/${encodeURIComponent(epub.name)}`,
+  };
+}
+
 export async function downloadEpub(
   runtime: EpubDownloadRuntime,
   book: CatalogBook,
   signal: AbortSignal,
   onProgress: (fraction: number | null) => void,
 ): Promise<'downloaded' | 'already-downloaded'> {
-  const bookId = `gutenberg-${book.id}`;
+  const bookId = book.publicationId ?? `gutenberg-${book.id}`;
   const existing = await runtime.findPublication(bookId);
   if (existing && runtime.fileExists(existing.localUri)) return 'already-downloaded';
   if (existing) await runtime.removePublication(bookId);
@@ -81,7 +127,7 @@ export async function downloadEpub(
       bookId,
       book,
       published.uri,
-      createGutenbergRightsNotice(book),
+      book.rightsNotice ?? createGutenbergRightsNotice(book),
       published.size,
     );
     onProgress(1);

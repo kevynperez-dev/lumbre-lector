@@ -4,10 +4,11 @@ import assert from 'node:assert/strict';
 import type { CatalogBook } from '../../src/features/catalog/catalog-api.ts';
 import {
   downloadEpub,
+  resolveArchiveEpubUrl,
   type DownloadFile,
   type EpubDownloadRuntime,
 } from '../../src/features/catalog/epub-download-core.ts';
-import { MAX_EPUB_SIZE } from '../../src/domain/epub.ts';
+import { getDownloadUrl, MAX_EPUB_SIZE } from '../../src/domain/epub.ts';
 
 const book: CatalogBook = {
   id: 31,
@@ -19,6 +20,37 @@ const book: CatalogBook = {
   epubUrl: 'https://www.gutenberg.org/cache/epub/31/pg31.epub',
   sourceUrl: 'https://www.gutenberg.org/ebooks/31',
 };
+
+test('resolves only public, listed Internet Archive EPUB files within the size limit', () => {
+  const publicBook: CatalogBook = {
+    ...book,
+    publicationId: 'openlibrary-OL50444320M',
+    sourceName: 'Open Library',
+    archiveIdentifier: 'bwb_KS-179-237',
+    epubUrl: 'https://archive.org/download/bwb_KS-179-237/bwb_KS-179-237.epub',
+  };
+  const resolved = resolveArchiveEpubUrl(publicBook, {
+    metadata: { 'access-restricted-item': false },
+    files: [
+      { name: 'book.pdf', format: 'PDF', size: '5000' },
+      { name: 'libro público.epub', format: 'EPUB', size: '1400' },
+    ],
+  });
+  assert.equal(resolved.epubUrl, 'https://archive.org/download/bwb_KS-179-237/libro%20p%C3%BAblico.epub');
+  assert.equal(getDownloadUrl(resolved), resolved.epubUrl);
+  assert.throws(() => resolveArchiveEpubUrl(publicBook, {
+    metadata: { 'access-restricted-item': 'true' },
+    files: [{ name: 'locked.epub', format: 'EPUB', size: '10' }],
+  }), /restringido/i);
+  assert.throws(() => resolveArchiveEpubUrl(publicBook, {
+    metadata: {},
+    files: [{ name: '../private.epub', format: 'EPUB', size: '10' }],
+  }), /no ofrece un EPUB/i);
+  assert.throws(() => resolveArchiveEpubUrl(publicBook, {
+    metadata: {},
+    files: [{ name: 'large.epub', format: 'EPUB', size: String(MAX_EPUB_SIZE + 1) }],
+  }), /100 MB/i);
+});
 
 function validEpubHeader(): Uint8Array {
   const header = new Uint8Array(58);
