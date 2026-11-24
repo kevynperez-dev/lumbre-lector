@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, BackHandler, Linking, Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, BackHandler, Linking, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { ReadiumView } from 'react-native-readium';
-import type { Link, Locator, Preferences, PublicationReadyEvent, ReadiumViewRef } from 'react-native-readium';
+import type { Decoration, DecorationActivatedEvent, Link, Locator, Preferences, PublicationReadyEvent, ReadiumViewRef, SelectionActionEvent } from 'react-native-readium';
 import { useSQLiteContext } from 'expo-sqlite';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
-import type { Bookmark, Publication } from '../../database/types';
+import type { Annotation, Bookmark, Publication } from '../../database/types';
+import { createAnnotation } from './annotation-core';
 
 type ReaderTheme = NonNullable<Preferences['theme']>;
 
@@ -37,7 +38,7 @@ function flattenContents(links: Link[], depth = 0): Array<{ link: Link; depth: n
   ]);
 }
 
-function createBookmarkId(): string {
+function createLocalId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
@@ -62,6 +63,12 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
   const [activePanel, setActivePanel] = useState<'contents' | 'bookmarks' | null>(null);
   const [tableOfContents, setTableOfContents] = useState<Link[]>([]);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
+  const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const [savedView, setSavedView] = useState<'bookmarks' | 'annotations'>('bookmarks');
+  const [isNoteComposerOpen, setIsNoteComposerOpen] = useState(false);
+  const [pendingNote, setPendingNote] = useState<{ locator: Locator; selectedText: string } | null>(null);
+  const [draftNote, setDraftNote] = useState('');
+  const [annotationMessage, setAnnotationMessage] = useState<string | null>(null);
   const [bookmarkMessage, setBookmarkMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [progress, setProgress] = useState(publication.progress);
@@ -71,9 +78,25 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeTheme = (preferences.theme ?? 'light') as ReaderTheme;
   const isDark = activeTheme === 'dark';
+  const readiumDecorations: Decoration[] = annotations.flatMap((annotation) => {
+    try {
+      return [{
+        id: annotation.id,
+        locator: JSON.parse(annotation.locator_json) as Locator,
+        style: { type: 'highlight', tint: annotation.color },
+        extras: { kind: annotation.kind, note: annotation.note_text },
+      }];
+    } catch {
+      return [];
+    }
+  });
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (isNoteComposerOpen) {
+        setIsNoteComposerOpen(false);
+        return true;
+      }
       if (isRightsOpen) {
         setIsRightsOpen(false);
         return true;
@@ -91,13 +114,13 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
     });
 
     return () => subscription.remove();
-  }, [activePanel, isRightsOpen, isSettingsOpen, onClose]);
+  }, [activePanel, isNoteComposerOpen, isRightsOpen, isSettingsOpen, onClose]);
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadReaderState() {
-      const [position, savedPreferences, savedBookmarks] = await Promise.all([
+      const [position, savedPreferences, savedBookmarks, savedAnnotations] = await Promise.all([
         database.getFirstAsync<{ locator_json: string }>(
           'SELECT locator_json FROM reading_positions WHERE publication_id = ?',
           publication.id,
@@ -108,6 +131,10 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
         ),
         database.getAllAsync<Bookmark>(
           'SELECT * FROM bookmarks WHERE publication_id = ? ORDER BY created_at DESC',
+          publication.id,
+        ),
+        database.getAllAsync<Annotation>(
+          'SELECT * FROM annotations WHERE publication_id = ? ORDER BY created_at DESC',
           publication.id,
         ),
       ]);
@@ -125,6 +152,7 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
       }
 
       setBookmarks(savedBookmarks);
+      setAnnotations(savedAnnotations);
 
       if (savedPreferences?.preference_value) {
         try {
@@ -255,7 +283,7 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
         || locator.title
         || `Posición de lectura · ${progressPercent}%`;
       const bookmark: Bookmark = {
-        id: createBookmarkId(),
+        id: createLocalId(),
         publication_id: publication.id,
         label,
         locator_json: locatorJson,
@@ -285,6 +313,82 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
     } catch {
       setBookmarkMessage('No se pudo eliminar el marcador. Inténtalo de nuevo.');
     }
+  }
+
+  async function saveAnnotation(kind: Annotation['kind'], locator: Locator, selectedText: string, noteText = ''): Promise<boolean> {
+    if (!selectedText.trim()) {
+      setAnnotationMessage('Selecciona un fragmento de texto antes de guardarlo.');
+      return false;
+    }
+    const annotation = createAnnotation({
+      id: createLocalId(),
+      publicationId: publication.id,
+      kind,
+      locator,
+      selectedText,
+      noteText,
+      createdAt: new Date().toISOString(),
+    });
+    if (!annotation) return false;
+    try {
+      const existing = await database.getFirstAsync<{ id: string }>(
+        'SELECT id FROM annotations WHERE publication_id = ? AND locator_json = ? LIMIT 1',
+        publication.id,
+        annotation.locator_json,
+      );
+      if (existing) {
+        setAnnotationMessage('Ya guardaste una anotación en este fragmento.');
+        return false;
+      }
+      await database.runAsync(
+        'INSERT INTO annotations (id, publication_id, kind, selected_text, note_text, locator_json, color) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        annotation.id,
+        annotation.publication_id,
+        annotation.kind,
+        annotation.selected_text,
+        annotation.note_text,
+        annotation.locator_json,
+        annotation.color,
+      );
+      setAnnotations((current) => [annotation, ...current]);
+      setAnnotationMessage(kind === 'highlight' ? 'Fragmento resaltado.' : 'Nota guardada.');
+      setSavedView('annotations');
+      setActivePanel('bookmarks');
+      return true;
+    } catch {
+      setAnnotationMessage('No se pudo guardar la anotación. Inténtalo de nuevo.');
+      return false;
+    }
+  }
+
+  function handleSelectionAction(event: SelectionActionEvent) {
+    const selectedText = event.selectedText.trim().slice(0, 4000);
+    if (!selectedText) return;
+    if (event.actionId === 'lumbre-highlight') {
+      void saveAnnotation('highlight', event.locator, selectedText);
+    } else if (event.actionId === 'lumbre-note') {
+      setPendingNote({ locator: event.locator, selectedText });
+      setDraftNote('');
+      setIsNoteComposerOpen(true);
+    }
+  }
+
+  async function deleteAnnotation(annotation: Annotation) {
+    try {
+      await database.runAsync('DELETE FROM annotations WHERE id = ?', annotation.id);
+      setAnnotations((current) => current.filter(({ id }) => id !== annotation.id));
+      setAnnotationMessage('Anotación eliminada.');
+    } catch {
+      setAnnotationMessage('No se pudo eliminar la anotación. Inténtalo de nuevo.');
+    }
+  }
+
+  function handleDecorationActivated(event: DecorationActivatedEvent) {
+    const annotation = annotations.find(({ id }) => id === event.decoration.id);
+    if (!annotation) return;
+    setSavedView('annotations');
+    setAnnotationMessage(annotation.note_text || 'Fragmento resaltado.');
+    setActivePanel('bookmarks');
   }
 
   function navigateTo(locator: Locator) {
@@ -360,6 +464,8 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
               onPress={() => {
                 setIsSettingsOpen(false);
                 setBookmarkMessage(null);
+                setAnnotationMessage(null);
+                setSavedView('bookmarks');
                 setActivePanel('bookmarks');
               }}
               className="min-h-11 justify-center rounded-full px-3"
@@ -383,6 +489,13 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
               style={{ flex: 1, backgroundColor: readerSurface[activeTheme] }}
               file={{ url: publication.local_uri, initialLocation }}
               preferences={preferences}
+              decorations={[{ name: 'lumbre-annotations', decorations: readiumDecorations }]}
+              selectionActions={[
+                { id: 'lumbre-highlight', label: 'Resaltar' },
+                { id: 'lumbre-note', label: 'Añadir nota' },
+              ]}
+              onSelectionAction={handleSelectionAction}
+              onDecorationActivated={handleDecorationActivated}
               onLocationChange={handleLocationChange}
               onPublicationReady={handlePublicationReady}
               onPublicationError={(event) => {
@@ -577,10 +690,31 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
                 </ScrollView>
               ) : (
                 <ScrollView showsVerticalScrollIndicator={false}>
-                  {bookmarkMessage ? (
+                  {savedView === 'bookmarks' && bookmarkMessage ? (
                     <Text accessibilityRole="alert" className={`mb-2 text-sm ${isDark ? 'text-night-subtle' : 'text-paper-subtle'}`}>{bookmarkMessage}</Text>
                   ) : null}
-                  {bookmarks.map((bookmark) => {
+                  {savedView === 'annotations' && annotationMessage ? (
+                    <Text accessibilityRole="alert" className={`mb-2 text-sm ${isDark ? 'text-night-subtle' : 'text-paper-subtle'}`}>{annotationMessage}</Text>
+                  ) : null}
+                  <View className="mb-3 flex-row rounded-full p-1" style={{ backgroundColor: isDark ? '#2C332E' : '#EEE9DF' }}>
+                    <Pressable
+                      accessibilityRole="tab"
+                      accessibilityState={{ selected: savedView === 'bookmarks' }}
+                      onPress={() => { setSavedView('bookmarks'); setBookmarkMessage(null); }}
+                      className={`flex-1 items-center rounded-full py-2 ${savedView === 'bookmarks' ? (isDark ? 'bg-night-green' : 'bg-paper-green') : ''}`}
+                    >
+                      <Text className={`text-xs font-semibold ${savedView === 'bookmarks' ? (isDark ? 'text-night-canvas' : 'text-white') : (isDark ? 'text-night-ink' : 'text-paper-ink')}`}>Marcadores ({bookmarks.length})</Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="tab"
+                      accessibilityState={{ selected: savedView === 'annotations' }}
+                      onPress={() => { setSavedView('annotations'); setAnnotationMessage(null); }}
+                      className={`flex-1 items-center rounded-full py-2 ${savedView === 'annotations' ? (isDark ? 'bg-night-green' : 'bg-paper-green') : ''}`}
+                    >
+                      <Text className={`text-xs font-semibold ${savedView === 'annotations' ? (isDark ? 'text-night-canvas' : 'text-white') : (isDark ? 'text-night-ink' : 'text-paper-ink')}`}>Notas y resaltados ({annotations.length})</Text>
+                    </Pressable>
+                  </View>
+                  {savedView === 'bookmarks' ? bookmarks.map((bookmark) => {
                     let locator: Locator | null = null;
                     try { locator = JSON.parse(bookmark.locator_json) as Locator; } catch { /* Skip corrupt saved locator. */ }
                     return (
@@ -607,9 +741,40 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
                         </Pressable>
                       </View>
                     );
+                  }) : annotations.map((annotation) => {
+                    let locator: Locator | null = null;
+                    try { locator = JSON.parse(annotation.locator_json) as Locator; } catch { /* Skip corrupt saved locator. */ }
+                    return (
+                      <View key={annotation.id} className={`flex-row items-center border-b py-2 ${isDark ? 'border-night-line' : 'border-paper-line'}`}>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={`Ir a la anotación ${annotation.selected_text}`}
+                          disabled={!locator}
+                          onPress={() => locator && navigateTo(locator)}
+                          className="min-h-12 flex-1 justify-center pr-2"
+                        >
+                          <Text numberOfLines={2} className={`text-sm ${isDark ? 'text-night-ink' : 'text-paper-ink'}`}>{annotation.selected_text}</Text>
+                          <Text numberOfLines={2} className={`mt-1 text-xs ${isDark ? 'text-night-subtle' : 'text-paper-subtle'}`}>
+                            {annotation.kind === 'note' ? annotation.note_text : 'Resaltado'}
+                          </Text>
+                        </Pressable>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={`Eliminar anotación ${annotation.selected_text}`}
+                          onPress={() => void deleteAnnotation(annotation)}
+                          className="min-h-11 justify-center rounded-full px-2"
+                        >
+                          <Text className={`text-sm font-semibold ${isDark ? 'text-red-200' : 'text-red-800'}`}>Quitar</Text>
+                        </Pressable>
+                      </View>
+                    );
                   })}
-                  {bookmarks.length === 0 ? (
-                    <Text className={`py-4 text-sm ${isDark ? 'text-night-subtle' : 'text-paper-subtle'}`}>Aún no has guardado marcadores. Toca “Marcar” mientras lees.</Text>
+                  {(savedView === 'bookmarks' ? bookmarks.length : annotations.length) === 0 ? (
+                    <Text className={`py-4 text-sm ${isDark ? 'text-night-subtle' : 'text-paper-subtle'}`}>
+                      {savedView === 'bookmarks'
+                        ? 'Aún no has guardado marcadores. Toca “Marcar” mientras lees.'
+                        : 'Mantén pulsado un fragmento para resaltarlo o añadir una nota.'}
+                    </Text>
                   ) : null}
                 </ScrollView>
               )}
@@ -669,6 +834,61 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
             <Pressable onPress={() => setIsRightsOpen(false)} className={`mt-3 items-center rounded-full py-3 ${isDark ? 'bg-night-green' : 'bg-paper-green'}`}>
               <Text className={`font-semibold ${isDark ? 'text-night-canvas' : 'text-white'}`}>Cerrar</Text>
             </Pressable>
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        visible={isNoteComposerOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsNoteComposerOpen(false)}
+      >
+        <View className="flex-1 justify-end bg-black/50 px-4 pb-6">
+          <View className={`rounded-3xl p-5 ${isDark ? 'bg-night-surface' : 'bg-paper-surface'}`}>
+            <Text className={`font-editorial text-xl ${isDark ? 'text-night-ink' : 'text-paper-ink'}`}>
+              Añadir nota
+            </Text>
+            <Text numberOfLines={4} className={`mt-3 text-sm ${isDark ? 'text-night-subtle' : 'text-paper-subtle'}`}>
+              {pendingNote?.selectedText}
+            </Text>
+            <TextInput
+              accessibilityLabel="Nota personal"
+              value={draftNote}
+              onChangeText={setDraftNote}
+              maxLength={2000}
+              multiline
+              textAlignVertical="top"
+              placeholder="Escribe tu nota…"
+              placeholderTextColor={isDark ? '#B8BDB5' : '#626A63'}
+              className={`mt-4 min-h-28 rounded-2xl border p-4 text-base ${isDark ? 'border-night-line text-night-ink' : 'border-paper-line text-paper-ink'}`}
+              style={{ backgroundColor: isDark ? '#171A18' : '#F8F5EF' }}
+            />
+            <View className="mt-4 flex-row justify-end gap-3">
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => { setIsNoteComposerOpen(false); setPendingNote(null); }}
+                className="min-h-11 justify-center rounded-full px-4"
+              >
+                <Text className={`font-semibold ${isDark ? 'text-night-subtle' : 'text-paper-subtle'}`}>Cancelar</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Guardar nota"
+                disabled={!draftNote.trim() || !pendingNote}
+                onPress={() => {
+                  if (!pendingNote) return;
+                  void saveAnnotation('note', pendingNote.locator, pendingNote.selectedText, draftNote).then((saved) => {
+                    if (saved) {
+                      setIsNoteComposerOpen(false);
+                      setPendingNote(null);
+                    }
+                  });
+                }}
+                className={`min-h-11 justify-center rounded-full px-5 ${isDark ? 'bg-night-green' : 'bg-paper-green'} ${!draftNote.trim() ? 'opacity-50' : ''}`}
+              >
+                <Text className={`font-semibold ${isDark ? 'text-night-canvas' : 'text-white'}`}>Guardar nota</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </Modal>

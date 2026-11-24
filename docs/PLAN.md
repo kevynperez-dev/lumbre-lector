@@ -28,19 +28,19 @@ Las duraciones son estimaciones relativas para un equipo pequeño y deben recali
 
 **Avance de biblioteca local:** se implementó selección de archivo EPUB con Document Picker Android, límite de 100 MB, comprobación inicial del contenedor ZIP, copia al directorio privado `documents/books` e inserción de metadatos en SQLite. El archivo queda guardado localmente; la apertura/lectura y la validación completa de EPUB dependen de la siguiente fase de lector.
 
-**Avance del lector EPUB:** integrado `react-native-readium` (Readium nativo para Android) mediante un build Expo. Un release shrinkeado se instaló en el emulador API 36; se importó el fixture EPUB local, abrió con Readium y se mostró su contenido. La primera apertura reveló una reflexión que R8 eliminaba; se añadió una regla de conservación reproducible al config plugin y el mismo flujo de lectura volvió a abrir sin crash. Restan corpus EPUB diversos, TalkBack y notas/anotaciones.
+**Avance del lector EPUB:** integrado `react-native-readium` (Readium nativo para Android) mediante un build Expo. Un release shrinkeado se instaló en el emulador API 36; se importó el fixture EPUB local, abrió con Readium y se mostró su contenido. La primera apertura reveló una reflexión que R8 eliminaba; se añadió una regla de conservación reproducible al config plugin y el mismo flujo de lectura volvió a abrir sin crash. Restan corpus EPUB diversos y TalkBack.
 
 ## Fase 3 — Dominio, SQLite y biblioteca local (1–2 semanas)
 
 **Trabajo:** entidades y errores, esquema versionado, migraciones, repositorios, fixtures legalmente utilizables, biblioteca, colecciones, ajustes y preferencias persistentes; importación local prototipo.
 
-**Implementación verificada:** migraciones SQLite hasta v3, importación privada EPUB, progreso/posición, preferencias persistidas, marcadores de lectura, reconciliación de archivos incompletos o huérfanos y eliminación confirmada de libros con limpieza del archivo local. Falta implementar colecciones, biblioteca ordenable/filtrable y cuotas de almacenamiento.
+**Implementación local:** migraciones SQLite hasta v4, importación privada EPUB, progreso/posición, preferencias persistidas, marcadores, notas y resaltados ligados a locators, reconciliación de archivos incompletos o huérfanos y eliminación confirmada de libros con limpieza del archivo local. Integración SQLite y tipos pasan localmente; la pasada final de E2E de Android queda agrupada con el resto de la implementación. Falta implementar colecciones, biblioteca ordenable/filtrable y cuotas de almacenamiento.
 
 **Salida:** los datos sobreviven reinicio y migración; pruebas automatizadas de migración/transacciones; borrar la app/copia sigue la política definida.
 
 ## Fase 4 — Lectura EPUB (2–4 semanas)
 
-**Trabajo:** completado el spike y elegida la integración `react-native-readium` 5.3 sobre el toolkit Readium Android. El puente usa Kotlin 2.3.20 y requiere JDK 17; Expo `expo-build-properties` fija Kotlin y compile SDK 37. Implementado abrir EPUB, recuperar/guardar locator estable y progreso en SQLite, índice de contenidos con navegación, marcadores persistidos y ajustes de tema/tipografía/interlineado/márgenes. La apariencia de los controles del lector sigue el tema elegido para el libro, independiente del tema general de la app.
+**Trabajo:** completado el spike y elegida la integración `react-native-readium` 5.3 sobre el toolkit Readium Android. El puente usa Kotlin 2.3.20 y requiere JDK 17; Expo `expo-build-properties` fija Kotlin y compile SDK 37. Implementado abrir EPUB, recuperar/guardar locator estable y progreso en SQLite, índice de contenidos con navegación, marcadores persistidos, selección de texto para crear notas y resaltados guardados como decoraciones Readium y ajustes de tema/tipografía/interlineado/márgenes. La apariencia de los controles del lector sigue el tema elegido para el libro, independiente del tema general de la app.
 
 **Salida:** APK release abre un EPUB propio de prueba y guarda el archivo localmente. El ajuste de R8 queda en el config plugin para builds regenerados. La automatización E2E ya cubre importación por selector Android, lectura, preferencias visuales persistidas y reapertura sin red en AVD API 36. Variar corpus/dispositivos y completar revisión TalkBack sigue pendiente; fase con aceptación funcional básica, calidad de beta pendiente.
 
@@ -56,7 +56,7 @@ Las duraciones son estimaciones relativas para un equipo pequeño y deben recali
 
 **Trabajo:** matriz de dispositivos Android; navegación TalkBack; tamaños grandes, contraste, orientación; libros corruptos/maliciosos, URL hostil, redirecciones, SQL inputs, almacenamiento lleno, interrupciones, regresión visual y rendimiento.
 
-**Automatización añadida y ejecutada:** 22 pruebas unitarias/de integración pasan; usan SQLite real para migraciones/persistencia y un runtime simulado para éxito/error/cancelación de descargas. E2E en release sobre AVD API 36 verifica error recuperable del catálogo offline, importación con DocumentsUI, apertura Readium, navegación del índice, alta y persistencia de marcadores, cambios de apariencia, progreso tipográfico, persistencia, eliminación confirmada y reapertura offline. Hay capturas del catálogo, biblioteca, lector y paletas; la revisión visual de capturas 720×1600 y sus guardas de luminancia pasan. Sigue pendiente ampliar TalkBack, corpus de EPUB malformados y compatibilidad en dispositivos físicos.
+**Automatización:** 25 pruebas unitarias/de integración pasan; usan SQLite real para migraciones/persistencia, un runtime simulado para éxito/error/cancelación de descargas y pruebas puras de creación/normalización de anotaciones. La última pasada completa previa a notas cubrió catálogo offline, importación, Readium, índice/marcadores, temas y reapertura offline en AVD API 36. El E2E ahora también automatiza selección y nota persistida; queda pendiente ejecutarlo junto con la comprobación visual final al cerrar la implementación, según el flujo de trabajo acordado. Sigue pendiente ampliar TalkBack, corpus de EPUB malformados y compatibilidad en dispositivos físicos.
 
 **Salida:** cero defectos bloqueantes conocidos; objetivos de rendimiento documentados; revisión de privacidad, términos y manejo de datos; recuperación probada.
 

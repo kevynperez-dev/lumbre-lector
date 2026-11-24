@@ -55,6 +55,24 @@ export const DATABASE_MIGRATIONS = [
       PRAGMA user_version = 3;
     `,
   },
+  {
+    version: 4,
+    sql: `
+      CREATE TABLE IF NOT EXISTS annotations (
+        id TEXT PRIMARY KEY NOT NULL,
+        publication_id TEXT NOT NULL REFERENCES publications(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL CHECK (kind IN ('highlight', 'note')),
+        selected_text TEXT NOT NULL,
+        note_text TEXT NOT NULL DEFAULT '',
+        locator_json TEXT NOT NULL,
+        color TEXT NOT NULL DEFAULT '#F3D879',
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_annotations_publication_created
+      ON annotations(publication_id, created_at DESC);
+      PRAGMA user_version = 4;
+    `,
+  },
 ];
 
 export async function migrateDatabase(database: SQLiteDatabase): Promise<void> {

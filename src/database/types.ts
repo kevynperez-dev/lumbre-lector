@@ -20,3 +20,14 @@ export type Bookmark = {
   locator_json: string;
   created_at: string;
 };
+
+export type Annotation = {
+  id: string;
+  publication_id: string;
+  kind: 'highlight' | 'note';
+  selected_text: string;
+  note_text: string;
+  locator_json: string;
+  color: string;
+  created_at: string;
+};

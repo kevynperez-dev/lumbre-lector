@@ -40,8 +40,13 @@ wait_text() {
   local needle="$1"
   local timeout="${2:-25}"
   local end=$((SECONDS + timeout))
+  echo "E2E: esperando '$needle'"
   until has_text "$needle"; do
-    (( SECONDS < end )) || fail "No apareció en pantalla: $needle"
+    if (( SECONDS >= end )); then
+      dump_xml > "$ARTIFACT_DIR/failure-screen.xml"
+      adb_cmd exec-out screencap -p > "$ARTIFACT_DIR/failure-screen.png" 2>/dev/null || true
+      fail "No apareció en pantalla: $needle (capturas de diagnóstico en $ARTIFACT_DIR)"
+    fi
     sleep 1
   done
 }
@@ -64,9 +69,9 @@ tap_text() {
   adb_cmd shell input tap "$x" "$y"
 }
 
-tap_file_tile() {
-  local label="$1" bounds
-  bounds="$(dump_xml | python3 -c 'import sys,xml.etree.ElementTree as E; label=sys.argv[1].casefold(); r=E.fromstring(sys.stdin.read()); parents={c:p for p in r.iter() for c in p}; matches=[]
+file_tile_bounds() {
+  local label="$1"
+  dump_xml | python3 -c 'import sys,xml.etree.ElementTree as E; label=sys.argv[1].casefold(); r=E.fromstring(sys.stdin.read()); parents={c:p for p in r.iter() for c in p}; matches=[]
 for n in r.iter():
  if (n.get("text") or "").casefold()==label:
   p=parents.get(n)
@@ -76,7 +81,14 @@ for n in r.iter():
 def area(b):
  import re
  a,c,d,e=map(int,re.findall(r"\d+",b)); return (d-a)*(e-c)
-print(min(matches,key=area) if matches else "")' "$label")"
+print(min(matches,key=area) if matches else "")' "$label"
+}
+
+has_file_tile() { [[ -n "$(file_tile_bounds "$1")" ]]; }
+
+tap_file_tile() {
+  local label="$1" bounds
+  bounds="$(file_tile_bounds "$label")"
   [[ -n "$bounds" ]] || fail "No se encontró la tarjeta del archivo: $label"
   read -r x y < <(python3 -c 'import re,sys; a,b,c,d=map(int,re.findall(r"\d+",sys.argv[1])); print((a+c)//2,(b+d)//2)' "$bounds")
   adb_cmd shell input tap "$x" "$y"
@@ -96,6 +108,7 @@ trap on_exit EXIT
 adb_cmd push "$FIXTURE" "/sdcard/Download/$TEST_BOOK_FILE" >/dev/null
 adb_cmd shell am force-stop "$PACKAGE"
 adb_cmd shell monkey -p "$PACKAGE" 1 >/dev/null
+wait_text "Biblioteca"
 tap_text "Biblioteca"
 wait_text "Tus libros"
 capture library-before.png
@@ -120,19 +133,16 @@ if ! has_text "$TEST_BOOK_TITLE"; then
   if ! has_text "Downloads"; then adb_cmd shell input tap 55 95; fi
   wait_text "Downloads"
   tap_text "Downloads"
-  # Downloads grows on repeated runs; scroll until the uniquely named fixture is visible.
+  tap_text "Search"
+  adb_cmd shell input tap 350 95
+  adb_cmd shell input text "$TEST_BOOK_FILE"
   for _ in 1 2 3 4 5 6 7 8 9 10; do
-    has_exact_text "$TEST_BOOK_FILE" && break
-    adb_cmd shell input swipe 360 1370 360 560 250
+    has_file_tile "$TEST_BOOK_FILE" && break
     sleep 1
   done
-  has_exact_text "$TEST_BOOK_FILE" || fail "No se pudo mostrar el archivo de prueba en Downloads."
+  has_file_tile "$TEST_BOOK_FILE" || fail "La búsqueda del archivo de prueba no devolvió una tarjeta en Downloads."
   wait_text "$TEST_BOOK_FILE"
-  for _ in 1 2 3; do
-    has_text "$TEST_BOOK_FILE" || break
-    tap_file_tile "$TEST_BOOK_FILE"
-    sleep 2
-  done
+  tap_file_tile "$TEST_BOOK_FILE"
   wait_text "$TEST_BOOK_TITLE"
 fi
 
@@ -146,6 +156,19 @@ tap_text "Ir a Capítulo 1"
 tap_text "Añadir marcador"
 wait_text "Marcador guardado"
 tap_text "Cerrar marcadores"
+adb_cmd shell input swipe 220 820 220 820 1100
+sleep 1
+# Readium attaches these actions to Android's native selection toolbar, which
+# is visible in the screenshot but intentionally absent from UIAutomator's tree.
+adb_cmd shell input tap 286 722
+wait_text "Nota personal"
+tap_text "Nota personal"
+adb_cmd shell input text "Nota%se2e%spersistente"
+tap_text "Guardar nota"
+wait_text "Nota guardada"
+has_text "Nota e2e persistente" || fail "La nota nueva no aparece en la lista de anotaciones."
+capture reader-annotations.png
+tap_text "Cerrar marcadores"
 adb_cmd shell input keyevent 4
 wait_text "Tus libros"
 tap_text "Leer $TEST_BOOK_TITLE"
@@ -153,6 +176,10 @@ wait_text "Un libro de prueba"
 tap_text "Abrir marcadores guardados"
 wait_text "Marcadores (1)"
 capture reader-bookmarks.png
+tap_text "Notas y resaltados (1)"
+wait_text "Nota e2e persistente"
+capture reader-annotations-reopened.png
+tap_text "Marcadores (1)"
 tap_text "Cerrar marcadores"
 
 tap_text "Abrir ajustes de lectura"

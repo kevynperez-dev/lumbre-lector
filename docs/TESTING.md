@@ -16,7 +16,7 @@ npm test
 npm run typecheck
 ```
 
-Las unitarias cubren la normalización de Gutendex, filtro conservador por derechos, URL/paginación, origen HTTPS permitido, estructura inicial obligatoria del EPUB, límite de tamaño, aviso legal y flujo de descarga con runtime simulado: éxito, progreso, idempotencia, cancelación, EPUB inválido y fallo al guardar metadatos. Las pruebas de integración ejecutan las migraciones SQL reales con SQLite y comprueban upgrade desde v1, constraints, borrado en cascada y actualización idempotente de preferencias.
+Las pruebas unitarias cubren la normalización de Gutendex, filtro conservador por derechos, URL/paginación, origen HTTPS permitido, estructura inicial obligatoria del EPUB, límite de tamaño, aviso legal, creación acotada de notas/resaltados y flujo de descarga con runtime simulado: éxito, progreso, idempotencia, cancelación, EPUB inválido y fallo al guardar metadatos. Las pruebas de integración ejecutan las migraciones SQL reales con SQLite y comprueban upgrade desde v1, constraints, borrado en cascada y actualización idempotente de preferencias. La suite local actual contiene 25 pruebas.
 
 ## E2E Android
 
@@ -30,7 +30,7 @@ npm run test:e2e:android
 npm run test:visual:android
 ```
 
-`ANDROID_SERIAL` permite seleccionar un dispositivo concreto. El flujo selecciona Biblioteca para no depender de la pestaña que quedó abierta en una ejecución anterior; prueba el error recuperable del catálogo sin conexión, importa el EPUB propio de `tests/fixtures` por el selector del sistema, navega por su índice, crea y vuelve a abrir un marcador, cambia a sepia y noche, guarda un tamaño de texto y vuelve a abrir el libro sin red. También verifica que el tema general sobrevive al reinicio del proceso y que eliminar un libro pide confirmación y lo quita de la biblioteca. Al salir, el script reactiva Wi‑Fi y datos del emulador. Las capturas incluyen índice y marcadores y se escriben en `/tmp/lumbre-e2e`; se pueden cambiar con `LUMBRE_E2E_ARTIFACTS`.
+`ANDROID_SERIAL` permite seleccionar un dispositivo concreto. El flujo selecciona Biblioteca para no depender de la pestaña que quedó abierta en una ejecución anterior; prueba el error recuperable del catálogo sin conexión, importa el EPUB propio de `tests/fixtures` por el selector del sistema, navega por su índice, crea y vuelve a abrir un marcador, selecciona texto para guardar una nota y vuelve a abrirla, cambia a sepia y noche, guarda un tamaño de texto y vuelve a abrir el libro sin red. También verifica que el tema general sobrevive al reinicio del proceso y que eliminar un libro pide confirmación y lo quita de la biblioteca. Al salir, el script reactiva Wi‑Fi y datos del emulador. Las capturas incluyen índice, marcadores y anotaciones y se escriben en `/tmp/lumbre-e2e`; se pueden cambiar con `LUMBRE_E2E_ARTIFACTS`.
 
 El chequeo visual toma la zona central del lector en las tres capturas y valida formato vertical y el orden de luminancia papel > sepia > noche. El resultado no reemplaza la inspección visual humana: al revisar una UI hay que comparar también recorte, tipografía, contraste, estados vacíos/error, tamaño de texto y controles TalkBack.
 
@@ -40,6 +40,7 @@ El chequeo visual toma la zona central del lector en las tres capturas y valida 
 - La descarga real desde Internet, cancelación a mitad de transferencia, reanudación tras cierre forzado, poco espacio y títulos con formatos corruptos requieren una red de prueba y dispositivos adicionales antes de beta.
 - La API de catálogo y los enlaces de libros son servicios externos sin SLA. Una caída de red no debe afectar la biblioteca ni los libros descargados.
 - No se distribuye contenido de terceros en los fixtures; el EPUB de E2E fue creado para el proyecto.
+- El flujo de selección de texto y notas ya está implementado y tiene cobertura SQLite local. Su pasada de E2E en Android se ejecutará en la verificación final después de completar las etapas restantes.
 
 ## Regla de aceptación
 
