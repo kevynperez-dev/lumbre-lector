@@ -73,6 +73,25 @@ export const DATABASE_MIGRATIONS = [
       PRAGMA user_version = 4;
     `,
   },
+  {
+    version: 5,
+    sql: `
+      ALTER TABLE publications ADD COLUMN file_size INTEGER NOT NULL DEFAULT 0 CHECK (file_size >= 0);
+      CREATE TABLE IF NOT EXISTS collections (
+        id TEXT PRIMARY KEY NOT NULL,
+        name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE TABLE IF NOT EXISTS publication_collections (
+        publication_id TEXT PRIMARY KEY NOT NULL REFERENCES publications(id) ON DELETE CASCADE,
+        collection_id TEXT NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
+        added_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_publication_collections_collection
+      ON publication_collections(collection_id);
+      PRAGMA user_version = 5;
+    `,
+  },
 ];
 
 export async function migrateDatabase(database: SQLiteDatabase): Promise<void> {

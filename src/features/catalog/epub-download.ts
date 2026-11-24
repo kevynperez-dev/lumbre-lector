@@ -77,18 +77,19 @@ export async function downloadBook(
       });
       return new NativeDownloadFile(result);
     },
-    async savePublication(id, selectedBook, localUri, rightsNotice) {
+    async savePublication(id, selectedBook, localUri, rightsNotice, fileSize) {
       await database.withTransactionAsync(async () => {
         await database.runAsync(
           `INSERT INTO publications
-            (id, title, author, language, format, local_uri, source_name, rights_notice)
-           VALUES (?, ?, ?, ?, 'epub', ?, 'Project Gutenberg', ?)`,
+            (id, title, author, language, format, local_uri, source_name, rights_notice, file_size)
+           VALUES (?, ?, ?, ?, 'epub', ?, 'Project Gutenberg', ?, ?)`,
           id,
           selectedBook.title,
           selectedBook.author,
           selectedBook.language,
           localUri,
           rightsNotice,
+          fileSize,
         );
       });
     },

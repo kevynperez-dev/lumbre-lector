@@ -34,7 +34,7 @@ Las duraciones son estimaciones relativas para un equipo pequeño y deben recali
 
 **Trabajo:** entidades y errores, esquema versionado, migraciones, repositorios, fixtures legalmente utilizables, biblioteca, colecciones, ajustes y preferencias persistentes; importación local prototipo.
 
-**Implementación local:** migraciones SQLite hasta v4, importación privada EPUB, progreso/posición, preferencias persistidas, marcadores, notas y resaltados ligados a locators, reconciliación de archivos incompletos o huérfanos y eliminación confirmada de libros con limpieza del archivo local. Integración SQLite y tipos pasan localmente; la pasada final de E2E de Android queda agrupada con el resto de la implementación. Falta implementar colecciones, biblioteca ordenable/filtrable y cuotas de almacenamiento.
+**Implementación local:** migraciones SQLite hasta v5, importación privada EPUB, progreso/posición, preferencias persistidas, marcadores, notas y resaltados ligados a locators, colecciones (una por libro), búsqueda local, filtros por colección, orden por actividad/título/progreso, tamaño ocupado y reconciliación de archivos incompletos/huérfanos. Integración SQLite, tipos y reglas puras de biblioteca pasan localmente; la pasada final de E2E de Android queda agrupada con el resto de la implementación. Sigue pendiente una política de cuota/límite de almacenamiento y muestra de espacio libre del dispositivo.
 
 **Salida:** los datos sobreviven reinicio y migración; pruebas automatizadas de migración/transacciones; borrar la app/copia sigue la política definida.
 
@@ -56,7 +56,7 @@ Las duraciones son estimaciones relativas para un equipo pequeño y deben recali
 
 **Trabajo:** matriz de dispositivos Android; navegación TalkBack; tamaños grandes, contraste, orientación; libros corruptos/maliciosos, URL hostil, redirecciones, SQL inputs, almacenamiento lleno, interrupciones, regresión visual y rendimiento.
 
-**Automatización:** 25 pruebas unitarias/de integración pasan; usan SQLite real para migraciones/persistencia, un runtime simulado para éxito/error/cancelación de descargas y pruebas puras de creación/normalización de anotaciones. La última pasada completa previa a notas cubrió catálogo offline, importación, Readium, índice/marcadores, temas y reapertura offline en AVD API 36. El E2E ahora también automatiza selección y nota persistida; queda pendiente ejecutarlo junto con la comprobación visual final al cerrar la implementación, según el flujo de trabajo acordado. Sigue pendiente ampliar TalkBack, corpus de EPUB malformados y compatibilidad en dispositivos físicos.
+**Automatización:** 29 pruebas unitarias/de integración pasan; usan SQLite real para migraciones/persistencia, runtime simulado de descarga y pruebas puras de anotaciones, búsqueda/orden/filtro de biblioteca y tamaño ocupado. La última pasada completa previa a notas cubrió catálogo offline, importación, Readium, índice/marcadores, temas y reapertura offline en AVD API 36. El E2E está ampliado para colecciones, selección/notas y persistencia; la ejecución completa del emulador y revisión visual se hará en un único cierre al completar la implementación. Sigue pendiente ampliar TalkBack, corpus de EPUB malformados y compatibilidad en dispositivos físicos.
 
 **Salida:** cero defectos bloqueantes conocidos; objetivos de rendimiento documentados; revisión de privacidad, términos y manejo de datos; recuperación probada.
 

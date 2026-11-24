@@ -10,6 +10,7 @@ PACKAGE="app.lumbre.reader"
 TEST_BOOK_KEY="${BASHPID:-$$}-$(date +%s)"
 TEST_BOOK_TITLE="lumbre e2e ${TEST_BOOK_KEY//-/ }"
 TEST_BOOK_FILE="lumbre-e2e-${TEST_BOOK_KEY}.epub"
+TEST_COLLECTION_NAME="Lumbre E2E ${TEST_BOOK_KEY//-/ }"
 
 adb_cmd() {
   if [[ -n "$DEVICE" ]]; then adb -s "$DEVICE" "$@"; else adb "$@"; fi
@@ -145,6 +146,19 @@ if ! has_text "$TEST_BOOK_TITLE"; then
   tap_file_tile "$TEST_BOOK_FILE"
   wait_text "$TEST_BOOK_TITLE"
 fi
+
+tap_text "＋ Crear"
+tap_text "Nombre de la colección"
+adb_cmd shell input text "${TEST_COLLECTION_NAME// /%s}"
+tap_text "Guardar colección"
+wait_text "$TEST_COLLECTION_NAME"
+tap_text "Organizar $TEST_BOOK_TITLE"
+tap_text "$TEST_COLLECTION_NAME"
+wait_text "$TEST_BOOK_TITLE"
+tap_text "$TEST_COLLECTION_NAME"
+wait_text "$TEST_BOOK_TITLE"
+capture library-collection.png
+tap_text "Todos"
 
 tap_text "Leer $TEST_BOOK_TITLE"
 wait_text "Un libro de prueba"

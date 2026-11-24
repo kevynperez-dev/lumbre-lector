@@ -56,11 +56,12 @@ export async function importEpub(database: SQLiteDatabase): Promise<boolean> {
   try {
     await source.copy(localFile);
     await database.runAsync(
-      `INSERT INTO publications (id, title, author, language, format, local_uri, source_name)
-       VALUES (?, ?, '', 'und', 'epub', ?, 'Archivo local')`,
+      `INSERT INTO publications (id, title, author, language, format, local_uri, source_name, file_size)
+       VALUES (?, ?, '', 'und', 'epub', ?, 'Archivo local', ?)`,
       id,
       title || 'Libro sin título',
       localFile.uri,
+      localFile.size,
     );
   } catch (error) {
     if (localFile.exists) localFile.delete();

@@ -9,8 +9,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useColorScheme } from 'nativewind';
 
 import { migrateDatabase } from './src/database/migrations';
-import type { Publication } from './src/database/types';
+import type { Collection, Publication } from './src/database/types';
 import { importEpub } from './src/features/library/import-epub';
+import { LibrarySection } from './src/features/library/LibrarySection';
 import { CatalogScreen } from './src/features/catalog/CatalogScreen';
 import { reconcileBookFiles } from './src/features/library/reconcile-books';
 import { ReaderScreen } from './src/features/reader/ReaderScreen';
@@ -25,6 +26,7 @@ function AppContent() {
   setColorSchemeRef.current = colorSchemeController.setColorScheme;
   const [activeTab, setActiveTab] = useState<Tab>('library');
   const [books, setBooks] = useState<Publication[]>([]);
+  const [collections, setCollections] = useState<Collection[]>([]);
   const [isImporting, setIsImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [selectedBook, setSelectedBook] = useState<Publication | null>(null);
@@ -87,9 +89,52 @@ function AppContent() {
 
   async function refreshLibrary() {
     const rows = await database.getAllAsync<Publication>(
-      'SELECT * FROM publications ORDER BY COALESCE(last_opened_at, added_at) DESC',
+      `SELECT p.*, pc.collection_id, c.name AS collection_name
+       FROM publications p
+       LEFT JOIN publication_collections pc ON pc.publication_id = p.id
+       LEFT JOIN collections c ON c.id = pc.collection_id
+       ORDER BY COALESCE(p.last_opened_at, p.added_at) DESC`,
     );
     setBooks(rows);
+  }
+
+  async function refreshCollections() {
+    setCollections(await database.getAllAsync<Collection>('SELECT * FROM collections ORDER BY name COLLATE NOCASE'));
+  }
+
+  async function createCollection(rawName: string) {
+    const name = rawName.trim().replace(/\s+/g, ' ');
+    if (!name || name.length > 48) throw new Error('Usa un nombre de entre 1 y 48 caracteres.');
+    const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+    try {
+      await database.runAsync('INSERT INTO collections (id, name) VALUES (?, ?)', id, name);
+    } catch {
+      throw new Error('Ya existe una colección con ese nombre.');
+    }
+    await refreshCollections();
+  }
+
+  async function assignCollection(publicationId: string, collectionId: string | null) {
+    await database.withTransactionAsync(async () => {
+      await database.runAsync('DELETE FROM publication_collections WHERE publication_id = ?', publicationId);
+      if (collectionId) {
+        await database.runAsync(
+          'INSERT INTO publication_collections (publication_id, collection_id) VALUES (?, ?)',
+          publicationId,
+          collectionId,
+        );
+      }
+    });
+    await refreshLibrary();
+  }
+
+  async function deleteCollection(collection: Collection) {
+    try {
+      await database.runAsync('DELETE FROM collections WHERE id = ?', collection.id);
+      await Promise.all([refreshCollections(), refreshLibrary()]);
+    } catch {
+      setLibraryError('No se pudo eliminar la colección. Inténtalo de nuevo.');
+    }
   }
 
   async function handleImport() {
@@ -125,10 +170,20 @@ function AppContent() {
     async function loadLibrary() {
       try {
         await reconcileBookFiles(database).catch(() => undefined);
-        const rows = await database.getAllAsync<Publication>(
-          'SELECT * FROM publications ORDER BY COALESCE(last_opened_at, added_at) DESC',
-        );
-        if (isMounted) setBooks(rows);
+        const [rows, savedCollections] = await Promise.all([
+          database.getAllAsync<Publication>(
+            `SELECT p.*, pc.collection_id, c.name AS collection_name
+             FROM publications p
+             LEFT JOIN publication_collections pc ON pc.publication_id = p.id
+             LEFT JOIN collections c ON c.id = pc.collection_id
+             ORDER BY COALESCE(p.last_opened_at, p.added_at) DESC`,
+          ),
+          database.getAllAsync<Collection>('SELECT * FROM collections ORDER BY name COLLATE NOCASE'),
+        ]);
+        if (isMounted) {
+          setBooks(rows);
+          setCollections(savedCollections);
+        }
       } catch {
         if (isMounted) setBooks([]);
       }
@@ -174,118 +229,21 @@ function AppContent() {
             </View>
 
             {activeTab === 'library' ? (
-              <>
-                <Text className="mb-2 text-sm font-semibold uppercase tracking-[3px] text-paper-green dark:text-night-green">
-                  TU ESPACIO DE LECTURA
-                </Text>
-                <Text className="font-editorial text-4xl leading-[46px] text-paper-ink dark:text-night-ink">
-                  Tus libros,{ '\n' }a tu ritmo.
-                </Text>
-                <Text className="mt-3 max-w-sm text-base leading-6 text-paper-subtle dark:text-night-subtle">
-                  Todo lo que guardes aquí estará disponible incluso sin conexión.
-                </Text>
-
-                <View className="mt-9 flex-row items-center justify-between border-b border-paper-line pb-4 dark:border-night-line">
-                  <Text className="font-editorial text-2xl text-paper-ink dark:text-night-ink">
-                    Mi biblioteca
-                  </Text>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Importar un archivo EPUB"
-                    disabled={isImporting}
-                    onPress={handleImport}
-                    className="rounded-full px-3 py-2"
-                  >
-                    <Text className="text-sm font-semibold text-paper-green dark:text-night-green">
-                      {isImporting ? 'Importando…' : '＋ Añadir EPUB'}
-                    </Text>
-                  </Pressable>
-                </View>
-
-                <Text className="mt-3 text-sm text-paper-subtle dark:text-night-subtle">
-                  {books.length} {books.length === 1 ? 'libro' : 'libros'} guardados en este dispositivo
-                </Text>
-
-                {importError ? (
-                  <View accessibilityRole="alert" className="mt-4 rounded-xl bg-red-100 px-4 py-3 dark:bg-red-950">
-                    <Text className="text-sm text-red-900 dark:text-red-100">{importError}</Text>
-                  </View>
-                ) : null}
-
-                {libraryError ? (
-                  <View accessibilityRole="alert" className="mt-4 rounded-xl bg-red-100 px-4 py-3 dark:bg-red-950">
-                    <Text className="text-sm text-red-900 dark:text-red-100">{libraryError}</Text>
-                  </View>
-                ) : null}
-
-                {books.length === 0 ? (
-                  <View className="flex-1 items-center justify-center py-12">
-                    <View className="mb-7 h-36 w-40 items-center justify-center">
-                      <View className="absolute left-4 top-8 h-24 w-16 -rotate-6 rounded-l-xl border-2 border-paper-green bg-paper-surface dark:border-night-green dark:bg-night-surface" />
-                      <View className="absolute right-4 top-8 h-24 w-16 rotate-6 rounded-r-xl border-2 border-paper-green bg-paper-surface dark:border-night-green dark:bg-night-surface" />
-                      <View className="absolute top-10 h-20 w-1 bg-paper-green dark:bg-night-green" />
-                      <Text className="absolute -right-1 top-0 text-3xl text-paper-terracotta dark:text-night-terracotta">✦</Text>
-                    </View>
-                    <Text className="font-editorial text-2xl text-paper-ink dark:text-night-ink">
-                      Aquí empieza tu próxima historia
-                    </Text>
-                    <Text className="mt-3 max-w-xs text-center text-base leading-6 text-paper-subtle dark:text-night-subtle">
-                      Cuando añadas un libro, aparecerá en tu biblioteca para leerlo donde quieras.
-                    </Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      disabled={isImporting}
-                      onPress={handleImport}
-                      className="mt-7 rounded-full bg-paper-green px-6 py-4 dark:bg-night-green"
-                    >
-                      <Text className="font-semibold text-white dark:text-night-canvas">
-                        {isImporting ? 'Importando…' : 'Importar un EPUB'}
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => setActiveTab('discover')}
-                      className="mt-4 rounded-full px-6 py-3"
-                    >
-                      <Text className="font-semibold text-paper-green dark:text-night-green">
-                        Explorar catálogo
-                      </Text>
-                    </Pressable>
-                  </View>
-                ) : (
-                  <View className="mt-5 gap-3">
-                    {books.map((book) => (
-                      <View key={book.id} className="rounded-2xl border border-paper-line bg-paper-surface p-4 dark:border-night-line dark:bg-night-surface">
-                        <Pressable
-                          accessibilityRole="button"
-                          accessibilityLabel={`Leer ${book.title}`}
-                          onPress={() => setSelectedBook(book)}
-                        >
-                          <Text className="font-editorial text-xl text-paper-ink dark:text-night-ink">
-                            {book.title}
-                          </Text>
-                          <Text className="mt-1 text-sm text-paper-subtle dark:text-night-subtle">
-                            {book.author || 'Autor desconocido'}
-                          </Text>
-                          {book.source_name ? (
-                            <Text className="mt-2 text-xs text-paper-green dark:text-night-green">
-                              {book.source_name} · guardado en este dispositivo
-                            </Text>
-                          ) : null}
-                        </Pressable>
-                        <Pressable
-                          accessibilityRole="button"
-                          accessibilityLabel={`Eliminar ${book.title} del dispositivo`}
-                          onPress={() => confirmDelete(book)}
-                          className="mt-3 min-h-11 self-start justify-center rounded-full px-3"
-                        >
-                          <Text className="text-sm font-semibold text-red-800 dark:text-red-200">Quitar libro</Text>
-                        </Pressable>
-                      </View>
-                    ))}
-                  </View>
-                )}
-              </>
+              <LibrarySection
+                books={books}
+                collections={collections}
+                isDark={isDark}
+                isImporting={isImporting}
+                importError={importError}
+                libraryError={libraryError}
+                onImport={handleImport}
+                onExploreCatalog={() => setActiveTab('discover')}
+                onOpen={(book) => setSelectedBook(book)}
+                onDelete={confirmDelete}
+                onCreateCollection={createCollection}
+                onAssignCollection={assignCollection}
+                onDeleteCollection={deleteCollection}
+              />
             ) : activeTab === 'discover' ? (
               <CatalogScreen isDark={isDark} onDownloaded={refreshLibrary} />
             ) : (

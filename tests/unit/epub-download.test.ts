@@ -32,7 +32,7 @@ function validEpubHeader(): Uint8Array {
 
 function fakeRuntime(options: { bytes?: Uint8Array; transferError?: Error } = {}) {
   const files = new Map<string, { bytes: Uint8Array | null }>();
-  const publications = new Map<string, { localUri: string; rightsNotice: string }>();
+  const publications = new Map<string, { localUri: string; rightsNotice: string; fileSize: number }>();
   const defaultBytes = options.bytes ?? validEpubHeader();
 
   function makeFile(name: string): DownloadFile {
@@ -68,8 +68,8 @@ function fakeRuntime(options: { bytes?: Uint8Array; transferError?: Error } = {}
       onProgress(entry.bytes.length, entry.bytes.length);
       return destination;
     },
-    async savePublication(id, _selectedBook, localUri, rightsNotice) {
-      publications.set(id, { localUri, rightsNotice });
+    async savePublication(id, _selectedBook, localUri, rightsNotice, fileSize) {
+      publications.set(id, { localUri, rightsNotice, fileSize });
     },
   };
   return { runtime, files, publications };
@@ -84,6 +84,7 @@ test('downloads, validates, publishes transactionally, reports progress, and rem
   assert.deepEqual(progress, [0.5, 1, 1]);
   assert.equal(fake.publications.get('gutenberg-31')?.localUri, 'file:///books/gutenberg-31.epub');
   assert.match(fake.publications.get('gutenberg-31')?.rightsNotice ?? '', /territorios/);
+  assert.equal(fake.publications.get('gutenberg-31')?.fileSize, 58);
   assert.equal(fake.files.get('file:///books/gutenberg-31.part')?.bytes, null);
   assert.ok(fake.files.get('file:///books/gutenberg-31.epub')?.bytes);
 });
@@ -132,7 +133,7 @@ test('does not download an already stored publication again', async () => {
   assert.ok(savedBytes);
   const target = fake.files.get(destination.uri)!;
   target.bytes = savedBytes;
-  fake.publications.set('gutenberg-31', { localUri: destination.uri, rightsNotice: '' });
+  fake.publications.set('gutenberg-31', { localUri: destination.uri, rightsNotice: '', fileSize: savedBytes.length });
 
   assert.equal(await downloadEpub(fake.runtime, book, new AbortController().signal, () => undefined), 'already-downloaded');
 });

@@ -15,9 +15,9 @@ function migrate(database: DatabaseSync) {
 test('migrates an empty database to the latest version with every app table', () => {
   const database = new DatabaseSync(':memory:');
   migrate(database);
-  assert.equal(Number(database.prepare('PRAGMA user_version').get()?.user_version), 4);
+  assert.equal(Number(database.prepare('PRAGMA user_version').get()?.user_version), 5);
   const names = database.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map((row) => row.name);
-  assert.deepEqual(names.sort(), ['annotations', 'bookmarks', 'publications', 'reading_positions', 'reader_preferences'].sort());
+  assert.deepEqual(names.sort(), ['annotations', 'bookmarks', 'collections', 'publication_collections', 'publications', 'reading_positions', 'reader_preferences'].sort());
   database.close();
 });
 
@@ -29,8 +29,9 @@ test('upgrades version 1 to the latest schema without losing stored publications
     "INSERT INTO publications (id, title, format, local_uri) VALUES (?, ?, 'epub', ?)",
   ).run('local-1', 'Libro guardado', 'file:///books/1.epub');
   migrate(database);
-  assert.equal(Number(database.prepare('PRAGMA user_version').get()?.user_version), 4);
+  assert.equal(Number(database.prepare('PRAGMA user_version').get()?.user_version), 5);
   assert.equal(database.prepare('SELECT title FROM publications WHERE id = ?').get('local-1')?.title, 'Libro guardado');
+  assert.equal(database.prepare('SELECT file_size FROM publications WHERE id = ?').get('local-1')?.file_size, 0);
   database.close();
 });
 
@@ -49,6 +50,8 @@ test('enforces progress bounds and cascades deleted publication positions', () =
   database.prepare(
     "INSERT INTO annotations (id, publication_id, kind, selected_text, locator_json) VALUES ('note', 'book', 'note', 'texto', '{}')",
   ).run();
+  database.prepare("INSERT INTO collections (id, name) VALUES ('collection', 'Lecturas')").run();
+  database.prepare("INSERT INTO publication_collections (publication_id, collection_id) VALUES ('book', 'collection')").run();
   assert.throws(() => database.prepare(
     "UPDATE publications SET progress = 1.1 WHERE id = 'book'",
   ).run());
@@ -56,9 +59,22 @@ test('enforces progress bounds and cascades deleted publication positions', () =
   assert.equal(database.prepare('SELECT count(*) AS total FROM reading_positions').get()?.total, 0);
   assert.equal(database.prepare('SELECT count(*) AS total FROM bookmarks').get()?.total, 0);
   assert.equal(database.prepare('SELECT count(*) AS total FROM annotations').get()?.total, 0);
+  assert.equal(database.prepare('SELECT count(*) AS total FROM publication_collections').get()?.total, 0);
   assert.throws(() => database.prepare(
     "INSERT INTO annotations (id, publication_id, kind, selected_text, locator_json) VALUES ('invalid', 'book', 'comment', 'texto', '{}')",
   ).run());
+  database.close();
+});
+
+test('collections keep names unique without case sensitivity and one collection per book', () => {
+  const database = new DatabaseSync(':memory:');
+  migrate(database);
+  database.prepare("INSERT INTO publications (id, title, format, local_uri) VALUES ('book', 'Libro', 'epub', 'file:///book.epub')").run();
+  database.prepare("INSERT INTO collections (id, name) VALUES ('one', 'Historia')").run();
+  database.prepare("INSERT INTO collections (id, name) VALUES ('two', 'Ciencia')").run();
+  database.prepare("INSERT INTO publication_collections (publication_id, collection_id) VALUES ('book', 'one')").run();
+  assert.throws(() => database.prepare("INSERT INTO collections (id, name) VALUES ('duplicate', 'HISTORIA')").run());
+  assert.throws(() => database.prepare("INSERT INTO publication_collections (publication_id, collection_id) VALUES ('book', 'two')").run());
   database.close();
 });
 

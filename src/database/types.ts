@@ -11,6 +11,15 @@ export type Publication = {
   added_at: string;
   last_opened_at: string | null;
   progress: number;
+  file_size: number;
+  collection_id?: string | null;
+  collection_name?: string | null;
+};
+
+export type Collection = {
+  id: string;
+  name: string;
+  created_at: string;
 };
 
 export type Bookmark = {

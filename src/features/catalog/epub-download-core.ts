@@ -32,6 +32,7 @@ export type EpubDownloadRuntime = {
     book: CatalogBook,
     localUri: string,
     rightsNotice: string,
+    fileSize: number,
   ): Promise<void>;
 };
 
@@ -70,6 +71,7 @@ export async function downloadEpub(
       book,
       published.uri,
       createGutenbergRightsNotice(book),
+      published.size,
     );
     onProgress(1);
     return 'downloaded';
