@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, BackHandler, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, BackHandler, Linking, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { ReadiumView } from 'react-native-readium';
 import type { Locator, Preferences, PublicationReadyEvent } from 'react-native-readium';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -15,6 +15,14 @@ const themeOptions: { value: ReaderTheme; label: string }[] = [
   { value: 'sepia', label: 'Sepia' },
   { value: 'dark', label: 'Noche' },
 ];
+
+const fontOptions = [
+  { value: 'serif', label: 'Serif' },
+  { value: 'sans-serif', label: 'Sans' },
+  { value: 'OpenDyslexic', label: 'Dislexia' },
+] as const;
+const lineHeightOptions = [1.3, 1.5, 1.8] as const;
+const marginOptions = [0.8, 1.2, 1.6] as const;
 
 const readerSurface: Record<ReaderTheme, string> = {
   light: '#FFFEFA',
@@ -39,6 +47,7 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
   });
   const [isReady, setIsReady] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isRightsOpen, setIsRightsOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [progress, setProgress] = useState(publication.progress);
   const [readerTitle, setReaderTitle] = useState(publication.title);
@@ -49,6 +58,10 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (isRightsOpen) {
+        setIsRightsOpen(false);
+        return true;
+      }
       if (isSettingsOpen) {
         setIsSettingsOpen(false);
         return true;
@@ -58,7 +71,7 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
     });
 
     return () => subscription.remove();
-  }, [isSettingsOpen, onClose]);
+  }, [isRightsOpen, isSettingsOpen, onClose]);
 
   useEffect(() => {
     let isMounted = true;
@@ -203,9 +216,20 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
             <Text numberOfLines={1} className={`font-editorial text-lg ${isDark ? 'text-night-ink' : 'text-paper-ink'}`}>
               {readerTitle}
             </Text>
-            <Text className={`mt-0.5 text-xs ${isDark ? 'text-night-subtle' : 'text-paper-subtle'}`}>
-              {publication.author || 'Lectura sin conexión'}
-            </Text>
+            <View className="mt-0.5 flex-row items-center gap-2">
+              <Text numberOfLines={1} className={`flex-1 text-xs ${isDark ? 'text-night-subtle' : 'text-paper-subtle'}`}>
+                {publication.author || 'Lectura sin conexión'}
+              </Text>
+              {publication.rights_notice ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Consultar fuente y derechos del libro"
+                  onPress={() => setIsRightsOpen(true)}
+                >
+                  <Text className="text-xs font-semibold text-paper-green dark:text-night-green">Derechos</Text>
+                </Pressable>
+              ) : null}
+            </View>
           </View>
           <Pressable
             accessibilityRole="button"
@@ -261,7 +285,8 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
           ) : null}
 
           {isSettingsOpen ? (
-            <View className={`absolute bottom-4 left-4 right-4 rounded-3xl p-5 shadow-lg ${isDark ? 'bg-night-surface' : 'bg-paper-surface'}`}>
+            <View className={`absolute bottom-4 left-4 right-4 max-h-[78%] rounded-3xl p-5 shadow-lg ${isDark ? 'bg-night-surface' : 'bg-paper-surface'}`}>
+              <ScrollView showsVerticalScrollIndicator={false}>
               <View className="mb-4 flex-row items-center justify-between">
                 <Text className={`font-editorial text-xl ${isDark ? 'text-night-ink' : 'text-paper-ink'}`}>
                   Apariencia de lectura
@@ -293,6 +318,69 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
                   );
                 })}
               </View>
+              <Text className={`mb-2 text-sm ${isDark ? 'text-night-subtle' : 'text-paper-subtle'}`}>
+                Tipografía
+              </Text>
+              <View className="mb-4 flex-row gap-2">
+                {fontOptions.map((option) => {
+                  const selected = (preferences.fontFamily ?? 'serif') === option.value;
+                  return (
+                    <Pressable
+                      key={option.value}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected }}
+                      onPress={() => void savePreferences({ ...preferences, fontFamily: option.value })}
+                      className={`flex-1 items-center rounded-full px-2 py-2.5 ${selected ? 'bg-paper-green dark:bg-night-green' : 'bg-paper-muted dark:bg-night-muted'}`}
+                    >
+                      <Text className={`text-xs font-semibold ${selected ? 'text-white dark:text-night-canvas' : isDark ? 'text-night-ink' : 'text-paper-ink'}`}>
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <View className="mb-4 flex-row items-center justify-between">
+                <Text className={`text-sm ${isDark ? 'text-night-subtle' : 'text-paper-subtle'}`}>Interlineado</Text>
+                <View className="flex-row gap-2">
+                  {lineHeightOptions.map((value) => {
+                    const selected = (preferences.lineHeight ?? 1.5) === value;
+                    return (
+                      <Pressable
+                        key={value}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected }}
+                        onPress={() => void savePreferences({ ...preferences, lineHeight: value })}
+                        className={`min-h-10 min-w-10 items-center justify-center rounded-full px-3 ${selected ? 'bg-paper-green dark:bg-night-green' : 'bg-paper-muted dark:bg-night-muted'}`}
+                      >
+                        <Text className={`text-xs font-semibold ${selected ? 'text-white dark:text-night-canvas' : isDark ? 'text-night-ink' : 'text-paper-ink'}`}>
+                          {value.toFixed(1)}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+              <View className="mb-4 flex-row items-center justify-between">
+                <Text className={`text-sm ${isDark ? 'text-night-subtle' : 'text-paper-subtle'}`}>Márgenes</Text>
+                <View className="flex-row gap-2">
+                  {marginOptions.map((value) => {
+                    const selected = (preferences.pageMargins ?? 1.2) === value;
+                    return (
+                      <Pressable
+                        key={value}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected }}
+                        onPress={() => void savePreferences({ ...preferences, pageMargins: value })}
+                        className={`min-h-10 min-w-10 items-center justify-center rounded-full px-3 ${selected ? 'bg-paper-green dark:bg-night-green' : 'bg-paper-muted dark:bg-night-muted'}`}
+                      >
+                        <Text className={`text-xs font-semibold ${selected ? 'text-white dark:text-night-canvas' : isDark ? 'text-night-ink' : 'text-paper-ink'}`}>
+                          {value.toFixed(1)}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
               <View className="flex-row items-center justify-between">
                 <Text className={`text-sm ${isDark ? 'text-night-subtle' : 'text-paper-subtle'}`}>
                   Tamaño de texto
@@ -312,6 +400,7 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
               <Pressable onPress={() => setIsSettingsOpen(false)} className="mt-4 items-center py-2">
                 <Text className="font-semibold text-paper-green dark:text-night-green">Listo</Text>
               </Pressable>
+              </ScrollView>
             </View>
           ) : null}
         </View>
@@ -330,6 +419,47 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
           </View>
         ) : null}
       </View>
+      <Modal
+        visible={isRightsOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsRightsOpen(false)}
+      >
+        <View className="flex-1 justify-center bg-black/50 px-6">
+          <View className={`rounded-3xl p-6 ${isDark ? 'bg-night-surface' : 'bg-paper-surface'}`}>
+            <Text className={`font-editorial text-2xl ${isDark ? 'text-night-ink' : 'text-paper-ink'}`}>
+              Fuente y derechos
+            </Text>
+            <Text className={`mt-4 text-sm leading-6 ${isDark ? 'text-night-subtle' : 'text-paper-subtle'}`}>
+              {publication.rights_notice}
+            </Text>
+            <Text className={`mt-3 text-sm leading-6 ${isDark ? 'text-night-subtle' : 'text-paper-subtle'}`}>
+              Project Gutenberg determina el estado de derechos conforme a la ley de Estados Unidos. La protección puede variar por país. El EPUB guardado mantiene el aviso y la licencia que venían con el archivo.
+            </Text>
+            <Pressable
+              accessibilityRole="link"
+              onPress={() => void Linking.openURL('https://www.gutenberg.org/policy/license')}
+              className="mt-5 py-2"
+            >
+              <Text className="font-semibold text-paper-green dark:text-night-green">
+                Leer la licencia de Project Gutenberg
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="link"
+              onPress={() => void Linking.openURL('https://www.gutenberg.org/')}
+              className="py-2"
+            >
+              <Text className="font-semibold text-paper-green dark:text-night-green">
+                Visitar Project Gutenberg
+              </Text>
+            </Pressable>
+            <Pressable onPress={() => setIsRightsOpen(false)} className="mt-3 items-center rounded-full bg-paper-green py-3 dark:bg-night-green">
+              <Text className="font-semibold text-white dark:text-night-canvas">Cerrar</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

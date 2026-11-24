@@ -10,6 +10,8 @@ import { useColorScheme } from 'nativewind';
 import { migrateDatabase } from './src/database/migrations';
 import type { Publication } from './src/database/types';
 import { importEpub } from './src/features/library/import-epub';
+import { CatalogScreen } from './src/features/catalog/CatalogScreen';
+import { reconcileBookFiles } from './src/features/library/reconcile-books';
 import { ReaderScreen } from './src/features/reader/ReaderScreen';
 
 type Tab = 'library' | 'discover' | 'settings';
@@ -52,14 +54,18 @@ function AppContent() {
   useEffect(() => {
     let isMounted = true;
 
-    database
-      .getAllAsync<Publication>('SELECT * FROM publications ORDER BY COALESCE(last_opened_at, added_at) DESC')
-      .then((rows) => {
+    async function loadLibrary() {
+      try {
+        await reconcileBookFiles(database).catch(() => undefined);
+        const rows = await database.getAllAsync<Publication>(
+          'SELECT * FROM publications ORDER BY COALESCE(last_opened_at, added_at) DESC',
+        );
         if (isMounted) setBooks(rows);
-      })
-      .catch(() => {
+      } catch {
         if (isMounted) setBooks([]);
-      });
+      }
+    }
+    void loadLibrary();
 
     return () => {
       isMounted = false;
@@ -188,32 +194,18 @@ function AppContent() {
                         <Text className="mt-1 text-sm text-paper-subtle dark:text-night-subtle">
                           {book.author || 'Autor desconocido'}
                         </Text>
+                        {book.source_name ? (
+                          <Text className="mt-2 text-xs text-paper-green dark:text-night-green">
+                            {book.source_name} · guardado en este dispositivo
+                          </Text>
+                        ) : null}
                       </Pressable>
                     ))}
                   </View>
                 )}
               </>
             ) : activeTab === 'discover' ? (
-              <View className="flex-1 pt-8">
-                <Text className="mb-2 text-sm font-semibold uppercase tracking-[3px] text-paper-green dark:text-night-green">
-                  DESCUBRIR
-                </Text>
-                <Text className="font-editorial text-4xl text-paper-ink dark:text-night-ink">
-                  Encuentra tu próxima lectura.
-                </Text>
-                <Text className="mt-4 text-base leading-6 text-paper-subtle dark:text-night-subtle">
-                  Estamos preparando la búsqueda y descarga de libros gratuitos desde Lumbre.
-                  Verificaremos los derechos y la fuente de cada título.
-                </Text>
-                <View className="mt-8 rounded-2xl bg-paper-muted p-5 dark:bg-night-muted">
-                  <Text className="text-base font-semibold text-paper-ink dark:text-night-ink">
-                    Próxima etapa
-                  </Text>
-                  <Text className="mt-2 text-sm leading-5 text-paper-subtle dark:text-night-subtle">
-                    La descarga se hará dentro de la app y los libros quedarán guardados en tu dispositivo.
-                  </Text>
-                </View>
-              </View>
+              <CatalogScreen isDark={isDark} onDownloaded={refreshLibrary} />
             ) : (
               <View className="flex-1 pt-8">
                 <Text className="mb-2 text-sm font-semibold uppercase tracking-[3px] text-paper-green dark:text-night-green">

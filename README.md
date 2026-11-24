@@ -13,6 +13,7 @@ La implementación usa Expo SDK 58, React Native, TypeScript, SQLite y NativeWin
 - [Riesgos, calidad y criterios de salida](docs/CALIDAD_Y_RIESGOS.md)
 - [Identidad visual y paletas](docs/IDENTIDAD_VISUAL.md)
 - [Fuentes consultadas](docs/FUENTES.md)
+- [Guía de pruebas](docs/TESTING.md)
 
 ## Decisiones iniciales
 
@@ -27,6 +28,10 @@ La implementación usa Expo SDK 58, React Native, TypeScript, SQLite y NativeWin
 
 ## Estado
 
-La implementación actual permite importar EPUBs desde el selector Android y guardarlos en el almacenamiento privado con metadatos SQLite. También integra el lector nativo Readium: abre los libros locales, recuerda la posición y permite cambiar entre temas papel/sepia/noche y tamaño de letra. El catálogo y las descargas desde Internet siguen pendientes; la lectura nativa debe validarse en un dispositivo/emulador con un development build.
+La implementación permite importar EPUBs desde el selector Android, buscarlos en un catálogo remoto Gutendex, descargarlos dentro de la app y guardarlos con sus metadatos en SQLite. Readium abre los libros locales, recuerda la posición y deja personalizar tema, tipografía, tamaño, interlineado y márgenes. La biblioteca y el lector funcionan con los EPUB guardados sin conexión.
 
-Para el lector se requiere un build nativo Android con JDK 17; Expo Go no incluye este módulo. El proyecto configura Kotlin 2.3.20 y compile SDK 37 mediante `expo-build-properties`.
+Gutendex muestra títulos que Project Gutenberg clasifica como no restringidos en Estados Unidos; la app explica que el estado legal puede variar según el país y conserva la licencia incluida en cada EPUB. La integración remota necesita una red disponible; los libros locales no.
+
+Para el lector se requiere un build nativo Android con JDK 17; Expo Go no incluye este módulo. El proyecto configura Kotlin 2.3.20, compile SDK 37 y las reglas de desugaring/R8 mediante plugins Expo.
+
+Pruebas automatizadas: `npm test`, `npm run typecheck`, `npm run test:e2e:android` y `npm run test:visual:android`. Los requisitos y límites de cada suite están descritos en [docs/TESTING.md](docs/TESTING.md).

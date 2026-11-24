@@ -2,7 +2,8 @@ import { File, FileMode, Directory, Paths } from 'expo-file-system';
 import * as DocumentPicker from 'expo-document-picker';
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-const MAX_IMPORT_SIZE = 100 * 1024 * 1024;
+import { isEpubContainerHeader, MAX_EPUB_SIZE } from '../../domain/epub';
+
 
 function createPublicationId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
@@ -22,7 +23,7 @@ export async function importEpub(database: SQLiteDatabase): Promise<boolean> {
     throw new Error('Selecciona un archivo EPUB.');
   }
 
-  if (asset.size !== undefined && asset.size > MAX_IMPORT_SIZE) {
+  if (asset.size !== undefined && asset.size > MAX_EPUB_SIZE) {
     throw new Error('El archivo supera el límite de 100 MB.');
   }
 
@@ -30,20 +31,20 @@ export async function importEpub(database: SQLiteDatabase): Promise<boolean> {
   if (!source.exists || source.size === 0) {
     throw new Error('No se pudo leer el archivo seleccionado.');
   }
-  if (source.size > MAX_IMPORT_SIZE) {
+  if (source.size > MAX_EPUB_SIZE) {
     throw new Error('El archivo supera el límite de 100 MB.');
   }
 
   const handle = source.open(FileMode.ReadOnly);
   let signature: Uint8Array;
   try {
-    signature = await handle.readBytes(4);
+    signature = await handle.readBytes(58);
   } finally {
     handle.close();
   }
 
-  if (signature[0] !== 0x50 || signature[1] !== 0x4b) {
-    throw new Error('El archivo no parece ser un EPUB válido.');
+  if (!isEpubContainerHeader(signature)) {
+    throw new Error('El archivo no tiene la estructura inicial obligatoria de un EPUB.');
   }
 
   const id = createPublicationId();

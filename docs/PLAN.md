@@ -24,11 +24,11 @@ Las duraciones son estimaciones relativas para un equipo pequeño y deben recali
 
 **Salida:** development build y build de prueba Expo instalables en Android; regla de dependencias por capa; pasos de build reproducibles; fallos capturables sin datos personales.
 
-**Avance inicial:** existe scaffold Expo SDK 58, configuración Android con icono Lumbre, base NativeWind/Tailwind, SQLite inicial con migración `user_version=1`, y pantalla inicial de Biblioteca/Descubrir/Ajustes con tema claro/oscuro. El catálogo todavía muestra su estado de próxima etapa y no simula resultados.
+**Avance inicial:** existe scaffold Expo SDK 58, configuración Android con icono Lumbre, base NativeWind/Tailwind, SQLite inicial con migración `user_version=1`, y pantalla inicial de Biblioteca/Descubrir/Ajustes con tema claro/oscuro.
 
 **Avance de biblioteca local:** se implementó selección de archivo EPUB con Document Picker Android, límite de 100 MB, comprobación inicial del contenedor ZIP, copia al directorio privado `documents/books` e inserción de metadatos en SQLite. El archivo queda guardado localmente; la apertura/lectura y la validación completa de EPUB dependen de la siguiente fase de lector.
 
-**Avance del lector EPUB:** integrado `react-native-readium` (Readium nativo para Android) mediante un development build Expo. La biblioteca abre los EPUB importados; el lector restaura y guarda el locator/progreso en SQLite, y ofrece temas papel/sepia/noche y tamaño de letra persistidos. La migración `user_version=2` añade posiciones y preferencias. La fase queda en implementación: falta aceptación en dispositivo Android real/emulador y ampliar navegación, tabla de contenidos, marcadores, anotaciones y pruebas con EPUB diversos.
+**Avance del lector EPUB:** integrado `react-native-readium` (Readium nativo para Android) mediante un build Expo. Un release shrinkeado se instaló en el emulador API 36; se importó el fixture EPUB local, abrió con Readium y se mostró su contenido. La primera apertura reveló una reflexión que R8 eliminaba; se añadió una regla de conservación reproducible al config plugin y el mismo flujo de lectura volvió a abrir sin crash. Restan corpus EPUB diversos, TalkBack, tabla de contenidos, marcadores y anotaciones.
 
 ## Fase 3 — Dominio, SQLite y biblioteca local (1–2 semanas)
 
@@ -38,19 +38,23 @@ Las duraciones son estimaciones relativas para un equipo pequeño y deben recali
 
 ## Fase 4 — Lectura EPUB (2–4 semanas)
 
-**Trabajo:** completado el spike y elegida la integración `react-native-readium` 5.3 sobre el toolkit Readium Android. El puente usa Kotlin 2.3.20 y requiere JDK 17; Expo `expo-build-properties` fija Kotlin y compile SDK 37. Implementado abrir EPUB, recuperar/guardar locator estable y progreso en SQLite, y guardar temas y tamaño de texto. Próximo trabajo de fase: probarlo en dispositivo con development build, revisar navegación/TOC y accesibilidad, y añadir marcadores/anotaciones según capacidades.
+**Trabajo:** completado el spike y elegida la integración `react-native-readium` 5.3 sobre el toolkit Readium Android. El puente usa Kotlin 2.3.20 y requiere JDK 17; Expo `expo-build-properties` fija Kotlin y compile SDK 37. Implementado abrir EPUB, recuperar/guardar locator estable y progreso en SQLite, y guardar temas y tamaño de texto. Se verificó el flujo importación→biblioteca→lectura en un release Android con minificación.
 
-**Salida:** set de EPUB de prueba con contenido simple/realista y casos límite; libros locales funcionan en modo avión; controles y lector accesibles. Aún no se declara cumplida: requiere verificación nativa en Android.
+**Salida:** APK release abre un EPUB propio de prueba y guarda el archivo localmente. El ajuste de R8 queda en el config plugin para builds regenerados. La automatización E2E ya cubre importación por selector Android, lectura, preferencias visuales persistidas y reapertura sin red en AVD API 36. Variar corpus/dispositivos y completar revisión TalkBack sigue pendiente; fase con aceptación funcional básica, calidad de beta pendiente.
 
 ## Fase 5 — Catálogo y descargas (2–3 semanas)
 
 **Trabajo:** primer adaptador de fuente autorizada, búsqueda, filtros, detalle legal y descarga íntegramente controlada desde la app: progreso, cancelación, reintentos, integridad, límites y reconciliación tras cierre/reapertura.
 
-**Salida:** búsqueda y descarga no sacan al usuario de la app; no se publica descarga incompleta; errores de red/espacio y cierre forzado son recuperables; licencia y origen llegan a la biblioteca local.
+**Implementación inicial:** catálogo Gutendex en español, búsqueda/paginación, filtro de registros sin restricciones de copyright según la clasificación de EE. UU. de Project Gutenberg, aceptación explícita de aviso territorial y descarga EPUB dentro de la app con progreso/cancelación, límite de 100 MB, validación de encabezado EPUB, nombre estable y guardado transaccional en SQLite. La API no responde en la red actual con VPN activa, así que la descarga real y su reanudación aún requieren verificación de conectividad autorizada. Revisión de términos pendiente antes de distribuir.
+
+**Salida:** flujo y políticas están implementados; la aceptación final requiere E2E de búsqueda/descarga real, cancelación, error/almacenamiento e inspección de licencia en una red disponible.
 
 ## Fase 6 — Calidad, accesibilidad y endurecimiento (2–3 semanas)
 
 **Trabajo:** matriz de dispositivos Android; navegación TalkBack; tamaños grandes, contraste, orientación; libros corruptos/maliciosos, URL hostil, redirecciones, SQL inputs, almacenamiento lleno, interrupciones, regresión visual y rendimiento.
+
+**Automatización añadida y ejecutada:** 16 pruebas unitarias/de integración pasan con SQLite real; E2E en release sobre AVD API 36 verifica importación de EPUB con DocumentsUI, apertura Readium, cambio de papel/sepia/noche, tamaño de letra, persistencia y lectura offline. La revisión visual de capturas 720×1600 y sus guardas de luminancia pasan. Sigue pendiente ampliar TalkBack, corpus de EPUB malformados y compatibilidad en dispositivos físicos.
 
 **Salida:** cero defectos bloqueantes conocidos; objetivos de rendimiento documentados; revisión de privacidad, términos y manejo de datos; recuperación probada.
 

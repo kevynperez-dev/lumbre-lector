@@ -31,8 +31,17 @@ Consulta: 23 de noviembre de 2026. Las versiones de SDK, runtime y librerías ca
 - [Project Gutenberg Terms of Use](https://www.gutenberg.org/policy/terms_of_use.html) — cautela sobre derechos fuera de EE. UU.
 - [Project Gutenberg License](https://www.gutenberg.org/policy/license) — condiciones del proyecto y atribución/redistribución.
 - [Project Gutenberg copyright help](https://www.gutenberg.org/help/copyright.html) — información general de copyright de obras.
+- [Project Gutenberg Robot Access](https://www.gutenberg.org/policy/robot_access.html) — métodos recomendados para catálogos y descargas automatizadas; el sitio principal puede bloquear automatización.
+- [Project Gutenberg Offline Catalogs](https://www.gutenberg.org/ebooks/offline_catalogs.html) — feeds y espejos para consulta automatizada. Sus feeds OPDS existentes tienen retiro anunciado para 2027.
+- [Gutendex API y contrato](https://github.com/garethbjohnson/gutendex) — índice de metadatos independiente que expone el indicador de copyright estadounidense, formato disponible y URL de descarga; no es operado por Project Gutenberg.
 - [Standard Ebooks Collections Policy](https://standardebooks.org/contribute/collections-policy) — su enfoque de dominio público en EE. UU. y advertencia territorial.
 
 ## Límites de la investigación
 
 Esta documentación formula arquitectura y requisitos de producto; no constituye opinión legal. Antes de distribución se deben revisar términos de cada proveedor, jurisdicciones objetivo, políticas vigentes de tiendas y licencias de dependencias. Las fuentes técnicas enlazadas respaldan capacidades generales, no garantizan compatibilidad de una combinación concreta de versiones.
+
+## Fuente habilitada en el catálogo MVP
+
+El primer adaptador usa metadatos Gutendex para localizar títulos en español con `copyright=false` y ofrece solo enlaces EPUB alojados en `gutenberg.org` por HTTPS. Ese indicador expresa la clasificación de Project Gutenberg bajo la ley de Estados Unidos; no certifica el estado legal en el país de la persona usuaria. La app excluye registros con derechos desconocidos o marcados como protegidos y muestra el alcance territorial antes de habilitar búsquedas y descargas.
+
+La aplicación conserva el EPUB íntegro y registra el origen y el aviso de derechos junto a la entrada local. La persona usuaria puede consultar la licencia desde el lector. El catálogo depende de una API comunitaria externa y del servicio de descargas de la fuente; el modo de lectura local no depende de ninguno de ellos. Antes de una distribución pública hay que confirmar si el patrón de solicitudes individuales de la app se ajusta a las reglas vigentes de acceso automatizado y preferir los espejos u offline catalogs apropiados si el volumen lo requiere.
