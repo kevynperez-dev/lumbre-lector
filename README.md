@@ -28,7 +28,7 @@ La implementación usa Expo SDK 58, React Native, TypeScript, SQLite y NativeWin
 
 ## Estado
 
-La implementación permite importar EPUBs desde el selector Android, buscarlos en un catálogo remoto Gutendex, descargarlos dentro de la app y guardarlos con sus metadatos en SQLite. Readium abre los libros locales, recuerda la posición y deja personalizar tema, tipografía, tamaño, interlineado y márgenes. La biblioteca y el lector funcionan con los EPUB guardados sin conexión.
+La implementación permite importar EPUBs desde el selector Android, buscarlos en un catálogo remoto Gutendex, descargarlos dentro de la app y guardarlos con sus metadatos en SQLite. Los ajustes de la aplicación permiten seguir el tema del dispositivo o fijar claro/oscuro, elegir acento, cambiar el tamaño de la interfaz y reforzar contraste; se guardan localmente. Readium abre los libros locales, recuerda la posición y permite configurar individualmente el tema, tipografía, tamaño, interlineado y márgenes de cada libro. La biblioteca y el lector funcionan con los EPUB guardados sin conexión.
 
 Gutendex muestra títulos que Project Gutenberg clasifica como no restringidos en Estados Unidos; la app explica que el estado legal puede variar según el país y conserva la licencia incluida en cada EPUB. La integración remota necesita una red disponible; los libros locales no.
 

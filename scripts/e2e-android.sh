@@ -37,6 +37,14 @@ has_exact_text() {
   dump_xml | python3 -c 'import sys,xml.etree.ElementTree as E; n=sys.argv[1].casefold(); r=E.fromstring(sys.stdin.read()); sys.exit(0 if any((x.get("text") or "").casefold()==n for x in r.iter()) else 1)' "$1"
 }
 
+has_checked() {
+  dump_xml | python3 -c 'import sys,xml.etree.ElementTree as E; n=sys.argv[1].casefold(); r=E.fromstring(sys.stdin.read()); sys.exit(0 if any(n in ((x.get("text") or "")+" "+(x.get("content-desc") or "")).casefold() and x.get("checked")=="true" for x in r.iter()) else 1)' "$1"
+}
+
+has_selected() {
+  dump_xml | python3 -c 'import sys,xml.etree.ElementTree as E; n=sys.argv[1].casefold(); r=E.fromstring(sys.stdin.read()); sys.exit(0 if any(n in ((x.get("text") or "")+" "+(x.get("content-desc") or "")).casefold() and x.get("selected")=="true" for x in r.iter()) else 1)' "$1"
+}
+
 wait_text() {
   local needle="$1"
   local timeout="${2:-25}"
@@ -240,7 +248,7 @@ sleep 5
 capture reader-offline.png
 if ! has_text "Abrir ajustes de lectura"; then fail "El lector local no se mantuvo disponible sin red."; fi
 
-# The app-wide appearance is stored in SQLite and survives a process restart.
+# App appearance, accent, and contrast preferences survive a process restart.
 adb_cmd shell input keyevent 4
 wait_text "Tus libros"
 capture library-with-book.png
@@ -252,15 +260,38 @@ wait_absent_text "$TEST_BOOK_TITLE"
 initial_dark=0
 if has_text "Activar modo claro"; then initial_dark=1; fi
 tap_text "Ajustes"
-if (( initial_dark == 0 )); then tap_text "Activar modo oscuro"; fi
-wait_text "Modo oscuro"
+adb_cmd shell input swipe 200 780 200 300 450
+if has_selected "Compacto" || has_selected "Grande"; then tap_text "Normal"; fi
+if has_checked "Contraste reforzado"; then tap_text "Contraste reforzado"; fi
+adb_cmd shell input swipe 200 300 200 780 450
+tap_text "Del dispositivo"
+tap_text "Oscuro"
+wait_text "Activar modo claro"
+tap_text "Azul océano"
+capture settings-accent.png
+adb_cmd shell input swipe 200 780 200 480 450
+capture settings-scale-standard.png
+tap_text "Grande"
+has_selected "Grande" || fail "No se seleccionó el tamaño grande de interfaz."
+capture settings-scale-large.png
+adb_cmd shell input swipe 200 780 200 300 450
+tap_text "Contraste reforzado"
+has_checked "Contraste reforzado" || fail "El contraste reforzado no quedó activado."
+capture settings-customized.png
 adb_cmd shell am force-stop "$PACKAGE"
 adb_cmd shell monkey -p "$PACKAGE" 1 >/dev/null
 wait_text "Tus libros"
 tap_text "Ajustes"
-wait_text "Modo oscuro"
-
-tap_text "Ajustes"
-if (( initial_dark == 0 )); then tap_text "Activar modo claro"; fi
+wait_text "Azul océano"
+has_text "Activar modo claro" || fail "La apariencia oscura no persistió al reiniciar."
+adb_cmd shell input swipe 200 780 200 300 450
+has_checked "Contraste reforzado" || fail "El contraste reforzado no persistió al reiniciar."
+has_selected "Grande" || fail "El tamaño grande de interfaz no persistió al reiniciar."
+tap_text "Contraste reforzado"
+adb_cmd shell input swipe 200 300 200 780 450
+tap_text "Verde Lumbre"
+if (( initial_dark == 0 )); then tap_text "Claro"; else tap_text "Oscuro"; fi
+adb_cmd shell input swipe 200 780 200 480 450
+tap_text "Normal"
 
 echo "E2E Android completado. Capturas: $ARTIFACT_DIR"

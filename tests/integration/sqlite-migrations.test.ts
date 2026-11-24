@@ -108,6 +108,28 @@ test('keeps reader preferences scoped to each publication', () => {
   database.close();
 });
 
+test('persists global app appearance, accent, and contrast preferences', () => {
+  const database = new DatabaseSync(':memory:');
+  migrate(database);
+  const save = database.prepare(`
+    INSERT INTO reader_preferences (preference_key, preference_value)
+    VALUES (?, ?)
+    ON CONFLICT(preference_key) DO UPDATE SET preference_value = excluded.preference_value
+  `);
+  save.run('appearance', 'system');
+  save.run('app:accent', 'ocean');
+  save.run('app:high-contrast', 'true');
+  const result = database.prepare(
+    "SELECT preference_key, preference_value FROM reader_preferences WHERE preference_key LIKE 'app:%' OR preference_key = 'appearance' ORDER BY preference_key",
+  ).all().map(({ preference_key, preference_value }) => ({ preference_key, preference_value }));
+  assert.deepEqual(result, [
+    { preference_key: 'app:accent', preference_value: 'ocean' },
+    { preference_key: 'app:high-contrast', preference_value: 'true' },
+    { preference_key: 'appearance', preference_value: 'system' },
+  ]);
+  database.close();
+});
+
 test('persists and advances a locator with its reading progression', () => {
   const database = new DatabaseSync(':memory:');
   migrate(database);

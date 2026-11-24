@@ -35,11 +35,11 @@
 | `focus` | `#8C4C19` | `#F4B36A` | Foco visible y controles de accesibilidad |
 | `danger` | `#A53A32` | `#FF8A80` | Error o acción destructiva |
 
-El modo claro se siente como una página de papel; el modo oscuro usa un carbón verdoso para reducir el contraste duro. El verde salvia sostiene acciones positivas; el terracota se reserva para la firma visual y llamadas puntuales. No usar color como única señal de estado.
+El modo claro se siente como una página de papel; el modo oscuro usa un carbón verdoso para reducir el contraste duro. El verde salvia sostiene acciones positivas por defecto; en Ajustes se puede cambiar el acento a azul océano o terracota. También hay contraste reforzado para textos secundarios y divisores. No usar color como única señal de estado.
 
 ## Tipografía y forma
 
-- Interfaz: tipografía sans nativa del sistema, con escalado de fuente Android habilitado.
+- Interfaz: tipografía sans nativa del sistema, con tres escalas propias (compacta, normal y grande) que se combinan con el escalado de fuente Android. El tamaño del libro se ajusta por separado desde el lector.
 - Títulos editoriales: serif disponible en assets/licencia aprobada o fallback serif del sistema. No incluir una fuente de terceros hasta revisar peso del APK, licencia y legibilidad.
 - Esquinas contenidas, separadores suaves y espacios generosos en superficies lectoras. Priorizar el texto del libro sobre adornos.
 - Iconografía de interfaz consistente y reconocible; mantener el icono de marca separado de los iconos funcionales.

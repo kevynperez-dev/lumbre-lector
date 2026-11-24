@@ -22,7 +22,7 @@ Una biblioteca digital personal, gratuita y usable sin conexión, exclusivamente
 4. Descarga integrada: búsqueda, selección, inicio, progreso, cancelación y reintento ocurren en la app, sin abrir navegador ni delegar la descarga a otra aplicación. Incluye validación, manejo de poco espacio y recuperación/reanudación al volver a abrir la app.
 5. EPUB reflowable para la lectura principal. Importación opcional de EPUB sin DRM desde el selector de documentos Android. Validar soporte real antes de prometer PDF.
 6. Progreso por publicación y ubicación recuperable después de cerrar o reiniciar; persistencia periódica sin escrituras por cada gesto.
-7. Ajustes de lectura: familia/tamaño de fuente, tema claro/oscuro/sepia, interlineado, márgenes y brillo opcional. Preferencias globales y por libro.
+7. Personalización visual en dos ámbitos: la aplicación permite seguir el tema del sistema o fijar claro/oscuro, elegir un color de acento, ajustar la escala de su interfaz y reforzar contraste; cada libro conserva por separado familia/tamaño de fuente, tema claro/oscuro/sepia, interlineado y márgenes.
 8. Índice de contenidos, navegación por capítulos, marcadores, notas y selección/resaltado cuando el motor lo permita.
 9. Abrir y leer títulos descargados en modo avión; estados vacíos, error, carga y recuperación.
 10. Privacidad por defecto: sin cuenta requerida, sin telemetría personal obligatoria, sin anuncios en el MVP.

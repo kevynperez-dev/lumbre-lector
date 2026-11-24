@@ -55,7 +55,7 @@ Mantener reglas de importación: dominio no depende de React Native, SQLite ni p
 ## Persistencia y archivos
 
 - SQLite guarda metadatos y estado pequeño; los EPUB/PDF se guardan como archivos en directorio privado persistente, con nombre interno no confiado y ruta guardada en DB.
-- Modelo inicial: `publications`, `creators`, `publication_creators`, `sources`, `downloads`, `reading_positions`, `bookmarks`, `annotations`, `collections`, `collection_items`, `reader_preferences`, `schema_migrations`.
+- Modelo inicial: `publications`, `creators`, `publication_creators`, `sources`, `downloads`, `reading_positions`, `bookmarks`, `annotations`, `collections`, `collection_items`, `reader_preferences`, `schema_migrations`. `reader_preferences` contiene preferencias globales de apariencia/acento/contraste y preferencias visuales por publicación.
 - Identificadores estables (UUID local y `provider_id` externo), timestamps UTC, campos `created_at/updated_at`, integridad referencial y restricciones únicas.
 - DB versionada por migraciones; transacciones para cambios relacionados; FTS opcional para metadatos/índice local, medir almacenamiento y reconstruibilidad.
 - Configurar foreign keys; evaluar WAL y FTS5 según soporte/build probado; parametrizar entradas; no usar `exec` para valores variables.
@@ -93,4 +93,4 @@ Consultar SQLite a través de casos de uso y capas de caché selectivas. Preferi
 3. **Proveedor desacoplado:** los términos y disponibilidad cambian; la interfaz de dominio no depende de un catálogo.
 4. **EPUB primero:** el texto reflowable satisface personalización básica; otros formatos requieren lectores y pruebas específicos.
 5. **Expo como plataforma:** mantener el flujo Expo para configuración y builds Android; usar development builds y extensiones nativas solo donde el lector o descargas lo requieran.
-6. **Motor EPUB:** `react-native-readium` 5.3, wrapper MIT sobre Readium Kotlin; el locator se persiste como JSON en `reading_positions`. `reader_preferences` conserva ajustes visuales por publicación, con valores globales anteriores como compatibilidad durante la migración.
+6. **Motor EPUB:** `react-native-readium` 5.3, wrapper MIT sobre Readium Kotlin; el locator se persiste como JSON en `reading_positions`. `reader_preferences` conserva ajustes de la app y ajustes visuales independientes por publicación, con valores globales anteriores como compatibilidad durante la migración.

@@ -2,19 +2,28 @@
 """Small pixel-level guard for the reader's paper, sepia, and night palettes."""
 
 import json
+import os
 import sys
 from pathlib import Path
 
-from PIL import Image, ImageStat
+from PIL import Image, ImageChops, ImageStat
 
 if len(sys.argv) == 1:
+    artifact_dir = Path(os.environ.get("LUMBRE_E2E_ARTIFACTS", "/tmp/lumbre-e2e"))
     sys.argv.extend((
-        "/tmp/lumbre-e2e/reader-light.png",
-        "/tmp/lumbre-e2e/reader-sepia.png",
-        "/tmp/lumbre-e2e/reader-dark.png",
+        str(artifact_dir / "reader-light.png"),
+        str(artifact_dir / "reader-sepia.png"),
+        str(artifact_dir / "reader-dark.png"),
     ))
-if len(sys.argv) != 4:
-    raise SystemExit("usage: python3 scripts/visual-test.py [LIGHT.png SEPIA.png DARK.png]")
+    settings_screenshot = artifact_dir / "settings-accent.png"
+    if settings_screenshot.is_file():
+        sys.argv.append(str(settings_screenshot))
+    standard_size = artifact_dir / "settings-scale-standard.png"
+    large_size = artifact_dir / "settings-scale-large.png"
+    if standard_size.is_file() and large_size.is_file():
+        sys.argv.extend((str(standard_size), str(large_size)))
+if len(sys.argv) not in (4, 5, 7):
+    raise SystemExit("usage: python3 scripts/visual-test.py [LIGHT.png SEPIA.png DARK.png [SETTINGS_ACCENT.png SETTINGS_STANDARD.png SETTINGS_LARGE.png]]")
 
 expected = ("light", "sepia", "dark")
 results = {}
@@ -51,5 +60,32 @@ if results["sepia"]["reading_surface_mean_rgb"] < 110:
     raise SystemExit(f"sepia theme is unexpectedly dark: {results}")
 if results["dark"]["reading_surface_mean_rgb"] > 100:
     raise SystemExit(f"night theme is unexpectedly bright: {results}")
+
+if len(sys.argv) in (5, 7):
+    path = Path(sys.argv[4])
+    if not path.is_file():
+        raise SystemExit(f"missing customized settings screenshot: {path}")
+    image = Image.open(path).convert("RGB")
+    blue_accent_pixels = sum(
+        1 for red, green, blue in image.getdata()
+        if blue > 145 and blue > red * 1.2 and blue > green * 0.98
+    )
+    results["settings_accent"] = {
+        "size": list(image.size),
+        "blue_accent_pixels": blue_accent_pixels,
+    }
+    if blue_accent_pixels < 300:
+        raise SystemExit(f"selected blue accent is not visible in settings: {results}")
+
+if len(sys.argv) == 7:
+    standard = Image.open(sys.argv[5]).convert("RGB")
+    large = Image.open(sys.argv[6]).convert("RGB")
+    if standard.size != large.size:
+        raise SystemExit(f"interface-size comparison screenshots differ in size: {standard.size} vs {large.size}")
+    difference = ImageStat.Stat(ImageChops.difference(standard, large))
+    mean_difference = round(sum(difference.mean) / 3, 3)
+    results["interface_scale_mean_pixel_difference"] = mean_difference
+    if mean_difference < 0.1:
+        raise SystemExit(f"large interface setting produced no visible change: {results}")
 
 print(json.dumps(results, ensure_ascii=False, indent=2))
