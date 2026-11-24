@@ -21,6 +21,7 @@
     "react-native-worklets": "0.13.0"
   },
   "devDependencies": {
+    "@types/node": "^26.6.6",
     "@types/react": "~19.3.0",
     "babel-preset-expo": "~58.0.26",
     "tailwindcss": "^3.4.17",
@@ -29,7 +30,10 @@
   "scripts": {
     "start": "expo start --dev-client",
     "android": "expo run:android",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.tests.json",
+    "test": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/unit/*.test.ts tests/integration/*.test.ts",
+    "test:e2e:android": "bash scripts/e2e-android.sh",
+    "test:visual:android": "python3 scripts/visual-test.py"
   },
   "private": true
 }
