@@ -131,3 +131,22 @@ test('persists and advances a locator with its reading progression', () => {
   assert.equal(position?.progress, 0.7);
   database.close();
 });
+
+test('updates a saved note without changing its selected passage or locator', () => {
+  const database = new DatabaseSync(':memory:');
+  migrate(database);
+  database.prepare(
+    "INSERT INTO publications (id, title, format, local_uri) VALUES ('book', 'Libro', 'epub', 'file:///book.epub')",
+  ).run();
+  database.prepare(
+    "INSERT INTO annotations (id, publication_id, kind, selected_text, note_text, locator_json) VALUES ('note', 'book', 'note', 'pasaje marcado', 'borrador', '{\"href\":\"capitulo.xhtml\"}')",
+  ).run();
+  database.prepare('UPDATE annotations SET note_text = ? WHERE id = ?').run('nota corregida', 'note');
+  const note = database.prepare(
+    'SELECT selected_text, note_text, locator_json FROM annotations WHERE id = ?',
+  ).get('note');
+  assert.equal(note?.selected_text, 'pasaje marcado');
+  assert.equal(note?.note_text, 'nota corregida');
+  assert.equal(note?.locator_json, '{"href":"capitulo.xhtml"}');
+  database.close();
+});

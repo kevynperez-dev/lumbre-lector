@@ -68,7 +68,10 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
   const [savedView, setSavedView] = useState<'bookmarks' | 'annotations'>('bookmarks');
   const [isNoteComposerOpen, setIsNoteComposerOpen] = useState(false);
   const [pendingNote, setPendingNote] = useState<{ locator: Locator; selectedText: string } | null>(null);
+  const [editingAnnotation, setEditingAnnotation] = useState<Annotation | null>(null);
   const [draftNote, setDraftNote] = useState('');
+  const [noteError, setNoteError] = useState<string | null>(null);
+  const [preferencesError, setPreferencesError] = useState<string | null>(null);
   const [annotationMessage, setAnnotationMessage] = useState<string | null>(null);
   const [bookmarkMessage, setBookmarkMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -243,16 +246,23 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
   );
 
   async function savePreferences(nextPreferences: Preferences) {
+    const previousPreferences = preferences;
     setPreferences(nextPreferences);
-    await database.runAsync(
-      `INSERT INTO reader_preferences (preference_key, preference_value, updated_at)
-       VALUES (?, ?, CURRENT_TIMESTAMP)
-       ON CONFLICT(preference_key) DO UPDATE SET
-         preference_value = excluded.preference_value,
-         updated_at = CURRENT_TIMESTAMP`,
-      readerPreferenceKey(publication.id),
-      JSON.stringify(nextPreferences),
-    );
+    setPreferencesError(null);
+    try {
+      await database.runAsync(
+        `INSERT INTO reader_preferences (preference_key, preference_value, updated_at)
+         VALUES (?, ?, CURRENT_TIMESTAMP)
+         ON CONFLICT(preference_key) DO UPDATE SET
+           preference_value = excluded.preference_value,
+           updated_at = CURRENT_TIMESTAMP`,
+        readerPreferenceKey(publication.id),
+        JSON.stringify(nextPreferences),
+      );
+    } catch {
+      setPreferences(previousPreferences);
+      setPreferencesError('No se pudieron guardar estos ajustes. Vuelve a intentarlo.');
+    }
   }
 
   function handlePublicationReady(event: PublicationReadyEvent) {
@@ -332,7 +342,9 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
 
   async function saveAnnotation(kind: Annotation['kind'], locator: Locator, selectedText: string, noteText = ''): Promise<boolean> {
     if (!selectedText.trim()) {
-      setAnnotationMessage('Selecciona un fragmento de texto antes de guardarlo.');
+      const message = 'Selecciona un fragmento de texto antes de guardarlo.';
+      setAnnotationMessage(message);
+      if (kind === 'note') setNoteError(message);
       return false;
     }
     const annotation = createAnnotation({
@@ -352,7 +364,9 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
         annotation.locator_json,
       );
       if (existing) {
-        setAnnotationMessage('Ya guardaste una anotación en este fragmento.');
+        const message = 'Ya guardaste una anotación en este fragmento.';
+        setAnnotationMessage(message);
+        if (kind === 'note') setNoteError(message);
         return false;
       }
       await database.runAsync(
@@ -367,12 +381,45 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
       );
       setAnnotations((current) => [annotation, ...current]);
       setAnnotationMessage(kind === 'highlight' ? 'Fragmento resaltado.' : 'Nota guardada.');
+      setNoteError(null);
       setSavedView('annotations');
       setActivePanel('bookmarks');
       return true;
     } catch {
-      setAnnotationMessage('No se pudo guardar la anotación. Inténtalo de nuevo.');
+      const message = 'No se pudo guardar la anotación. Inténtalo de nuevo.';
+      setAnnotationMessage(message);
+      if (kind === 'note') setNoteError(message);
       return false;
+    }
+  }
+
+  async function updateNote(annotation: Annotation, noteText: string) {
+    try {
+      const trimmedNote = noteText.trim();
+      await database.runAsync('UPDATE annotations SET note_text = ? WHERE id = ?', trimmedNote, annotation.id);
+      setAnnotations((current) => current.map((item) => item.id === annotation.id
+        ? { ...item, note_text: trimmedNote }
+        : item));
+      setAnnotationMessage('Nota actualizada.');
+      setNoteError(null);
+      setIsNoteComposerOpen(false);
+      setEditingAnnotation(null);
+      setPendingNote(null);
+    } catch {
+      setNoteError('No se pudo actualizar la nota. Inténtalo de nuevo.');
+    }
+  }
+
+  function openNoteEditor(annotation: Annotation) {
+    try {
+      const locator = JSON.parse(annotation.locator_json) as Locator;
+      setPendingNote({ locator, selectedText: annotation.selected_text });
+      setEditingAnnotation(annotation);
+      setDraftNote(annotation.note_text);
+      setNoteError(null);
+      setIsNoteComposerOpen(true);
+    } catch {
+      setAnnotationMessage('No se pudo abrir esta nota porque su posición está dañada.');
     }
   }
 
@@ -383,7 +430,9 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
       void saveAnnotation('highlight', event.locator, selectedText);
     } else if (event.actionId === 'lumbre-note') {
       setPendingNote({ locator: event.locator, selectedText });
+      setEditingAnnotation(null);
       setDraftNote('');
+      setNoteError(null);
       setIsNoteComposerOpen(true);
     }
   }
@@ -562,6 +611,9 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
                   <Text className={`text-lg ${isDark ? 'text-night-ink' : 'text-paper-ink'}`}>A−</Text>
                 </Pressable>
               </View>
+              {preferencesError ? (
+                <Text accessibilityRole="alert" className="mb-3 text-sm text-red-800 dark:text-red-200">{preferencesError}</Text>
+              ) : null}
               <View className="mb-5 flex-row gap-2">
                 {themeOptions.map((option) => {
                   const selected = activeTheme === option.value;
@@ -781,6 +833,16 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
                         >
                           <Text className={`text-sm font-semibold ${isDark ? 'text-red-200' : 'text-red-800'}`}>Quitar</Text>
                         </Pressable>
+                        {annotation.kind === 'note' ? (
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel={`Editar nota ${annotation.selected_text}`}
+                            onPress={() => openNoteEditor(annotation)}
+                            className="min-h-11 justify-center rounded-full px-2"
+                          >
+                            <Text className={`text-sm font-semibold ${isDark ? 'text-night-green' : 'text-paper-green'}`}>Editar</Text>
+                          </Pressable>
+                        ) : null}
                       </View>
                     );
                   })}
@@ -861,7 +923,7 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
         <View className="flex-1 justify-end bg-black/50 px-4 pb-6">
           <View className={`rounded-3xl p-5 ${isDark ? 'bg-night-surface' : 'bg-paper-surface'}`}>
             <Text className={`font-editorial text-xl ${isDark ? 'text-night-ink' : 'text-paper-ink'}`}>
-              Añadir nota
+              {editingAnnotation ? 'Editar nota' : 'Añadir nota'}
             </Text>
             <Text numberOfLines={4} className={`mt-3 text-sm ${isDark ? 'text-night-subtle' : 'text-paper-subtle'}`}>
               {pendingNote?.selectedText}
@@ -878,30 +940,36 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
               className={`mt-4 min-h-28 rounded-2xl border p-4 text-base ${isDark ? 'border-night-line text-night-ink' : 'border-paper-line text-paper-ink'}`}
               style={{ backgroundColor: isDark ? '#171A18' : '#F8F5EF' }}
             />
+            {noteError ? <Text accessibilityRole="alert" className="mt-2 text-sm text-red-800 dark:text-red-200">{noteError}</Text> : null}
             <View className="mt-4 flex-row justify-end gap-3">
               <Pressable
                 accessibilityRole="button"
-                onPress={() => { setIsNoteComposerOpen(false); setPendingNote(null); }}
+                onPress={() => { setIsNoteComposerOpen(false); setPendingNote(null); setEditingAnnotation(null); setNoteError(null); }}
                 className="min-h-11 justify-center rounded-full px-4"
               >
                 <Text className={`font-semibold ${isDark ? 'text-night-subtle' : 'text-paper-subtle'}`}>Cancelar</Text>
               </Pressable>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Guardar nota"
+                accessibilityLabel={editingAnnotation ? 'Guardar cambios de la nota' : 'Guardar nota'}
                 disabled={!draftNote.trim() || !pendingNote}
                 onPress={() => {
                   if (!pendingNote) return;
+                  if (editingAnnotation) {
+                    void updateNote(editingAnnotation, draftNote);
+                    return;
+                  }
                   void saveAnnotation('note', pendingNote.locator, pendingNote.selectedText, draftNote).then((saved) => {
                     if (saved) {
                       setIsNoteComposerOpen(false);
                       setPendingNote(null);
+                      setNoteError(null);
                     }
                   });
                 }}
                 className={`min-h-11 justify-center rounded-full px-5 ${isDark ? 'bg-night-green' : 'bg-paper-green'} ${!draftNote.trim() ? 'opacity-50' : ''}`}
               >
-                <Text className={`font-semibold ${isDark ? 'text-night-canvas' : 'text-white'}`}>Guardar nota</Text>
+                <Text className={`font-semibold ${isDark ? 'text-night-canvas' : 'text-white'}`}>{editingAnnotation ? 'Guardar cambios' : 'Guardar nota'}</Text>
               </Pressable>
             </View>
           </View>

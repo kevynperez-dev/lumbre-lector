@@ -181,6 +181,14 @@ adb_cmd shell input text "Nota%se2e%spersistente"
 tap_text "Guardar nota"
 wait_text "Nota guardada"
 has_text "Nota e2e persistente" || fail "La nota nueva no aparece en la lista de anotaciones."
+tap_text "Editar nota"
+wait_text "Editar nota"
+tap_text "Nota personal"
+adb_cmd shell input keyevent 123
+adb_cmd shell input text "%seditada"
+tap_text "Guardar cambios"
+wait_text "Nota actualizada"
+has_text "Nota e2e persistente editada" || fail "La edición de la nota no se reflejó en la lista."
 capture reader-annotations.png
 tap_text "Cerrar marcadores"
 adb_cmd shell input keyevent 4
@@ -191,7 +199,7 @@ tap_text "Abrir marcadores guardados"
 wait_text "Marcadores (1)"
 capture reader-bookmarks.png
 tap_text "Notas y resaltados (1)"
-wait_text "Nota e2e persistente"
+wait_text "Nota e2e persistente editada"
 capture reader-annotations-reopened.png
 tap_text "Marcadores (1)"
 tap_text "Cerrar marcadores"
