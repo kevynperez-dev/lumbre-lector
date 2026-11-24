@@ -30,7 +30,7 @@ npm run test:e2e:android
 npm run test:visual:android
 ```
 
-`ANDROID_SERIAL` permite seleccionar un dispositivo concreto. El flujo prueba el error recuperable del catálogo sin conexión, importa el EPUB propio de `tests/fixtures` por el selector del sistema, abre con Readium, cambia a sepia y noche, guarda un tamaño de texto y vuelve a abrir el libro sin red. También verifica que el tema general sobrevive al reinicio del proceso y que eliminar un libro pide confirmación y lo quita de la biblioteca. Al salir, el script reactiva Wi‑Fi y datos del emulador. Las capturas se escriben en `/tmp/lumbre-e2e`; se pueden cambiar con `LUMBRE_E2E_ARTIFACTS`.
+`ANDROID_SERIAL` permite seleccionar un dispositivo concreto. El flujo selecciona Biblioteca para no depender de la pestaña que quedó abierta en una ejecución anterior; prueba el error recuperable del catálogo sin conexión, importa el EPUB propio de `tests/fixtures` por el selector del sistema, navega por su índice, crea y vuelve a abrir un marcador, cambia a sepia y noche, guarda un tamaño de texto y vuelve a abrir el libro sin red. También verifica que el tema general sobrevive al reinicio del proceso y que eliminar un libro pide confirmación y lo quita de la biblioteca. Al salir, el script reactiva Wi‑Fi y datos del emulador. Las capturas incluyen índice y marcadores y se escriben en `/tmp/lumbre-e2e`; se pueden cambiar con `LUMBRE_E2E_ARTIFACTS`.
 
 El chequeo visual toma la zona central del lector en las tres capturas y valida formato vertical y el orden de luminancia papel > sepia > noche. El resultado no reemplaza la inspección visual humana: al revisar una UI hay que comparar también recorte, tipografía, contraste, estados vacíos/error, tamaño de texto y controles TalkBack.
 

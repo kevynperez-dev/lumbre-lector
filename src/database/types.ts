@@ -12,3 +12,11 @@ export type Publication = {
   last_opened_at: string | null;
   progress: number;
 };
+
+export type Bookmark = {
+  id: string;
+  publication_id: string;
+  label: string;
+  locator_json: string;
+  created_at: string;
+};

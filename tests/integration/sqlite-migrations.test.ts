@@ -15,13 +15,13 @@ function migrate(database: DatabaseSync) {
 test('migrates an empty database to the latest version with every app table', () => {
   const database = new DatabaseSync(':memory:');
   migrate(database);
-  assert.equal(Number(database.prepare('PRAGMA user_version').get()?.user_version), 2);
+  assert.equal(Number(database.prepare('PRAGMA user_version').get()?.user_version), 3);
   const names = database.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map((row) => row.name);
-  assert.deepEqual(names.sort(), ['publications', 'reading_positions', 'reader_preferences'].sort());
+  assert.deepEqual(names.sort(), ['bookmarks', 'publications', 'reading_positions', 'reader_preferences'].sort());
   database.close();
 });
 
-test('upgrades version 1 to version 2 without losing stored publications', () => {
+test('upgrades version 1 to the latest schema without losing stored publications', () => {
   const database = new DatabaseSync(':memory:');
   const versionOne = DATABASE_MIGRATIONS[0];
   database.exec(versionOne.sql);
@@ -29,7 +29,7 @@ test('upgrades version 1 to version 2 without losing stored publications', () =>
     "INSERT INTO publications (id, title, format, local_uri) VALUES (?, ?, 'epub', ?)",
   ).run('local-1', 'Libro guardado', 'file:///books/1.epub');
   migrate(database);
-  assert.equal(Number(database.prepare('PRAGMA user_version').get()?.user_version), 2);
+  assert.equal(Number(database.prepare('PRAGMA user_version').get()?.user_version), 3);
   assert.equal(database.prepare('SELECT title FROM publications WHERE id = ?').get('local-1')?.title, 'Libro guardado');
   database.close();
 });
@@ -43,11 +43,15 @@ test('enforces progress bounds and cascades deleted publication positions', () =
   database.prepare(
     "INSERT INTO reading_positions (publication_id, locator_json, progress) VALUES ('book', '{}', 0.42)",
   ).run();
+  database.prepare(
+    "INSERT INTO bookmarks (id, publication_id, label, locator_json) VALUES ('mark', 'book', 'Capítulo 1', '{}')",
+  ).run();
   assert.throws(() => database.prepare(
     "UPDATE publications SET progress = 1.1 WHERE id = 'book'",
   ).run());
   database.prepare("DELETE FROM publications WHERE id = 'book'").run();
   assert.equal(database.prepare('SELECT count(*) AS total FROM reading_positions').get()?.total, 0);
+  assert.equal(database.prepare('SELECT count(*) AS total FROM bookmarks').get()?.total, 0);
   database.close();
 });
 

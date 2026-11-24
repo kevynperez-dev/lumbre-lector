@@ -40,6 +40,21 @@ export const DATABASE_MIGRATIONS = [
       PRAGMA user_version = 2;
     `,
   },
+  {
+    version: 3,
+    sql: `
+      CREATE TABLE IF NOT EXISTS bookmarks (
+        id TEXT PRIMARY KEY NOT NULL,
+        publication_id TEXT NOT NULL REFERENCES publications(id) ON DELETE CASCADE,
+        label TEXT NOT NULL,
+        locator_json TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_bookmarks_publication_created
+      ON bookmarks(publication_id, created_at DESC);
+      PRAGMA user_version = 3;
+    `,
+  },
 ];
 
 export async function migrateDatabase(database: SQLiteDatabase): Promise<void> {

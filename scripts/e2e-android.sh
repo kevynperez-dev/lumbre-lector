@@ -96,6 +96,7 @@ trap on_exit EXIT
 adb_cmd push "$FIXTURE" "/sdcard/Download/$TEST_BOOK_FILE" >/dev/null
 adb_cmd shell am force-stop "$PACKAGE"
 adb_cmd shell monkey -p "$PACKAGE" 1 >/dev/null
+tap_text "Biblioteca"
 wait_text "Tus libros"
 capture library-before.png
 
@@ -119,15 +120,14 @@ if ! has_text "$TEST_BOOK_TITLE"; then
   if ! has_text "Downloads"; then adb_cmd shell input tap 55 95; fi
   wait_text "Downloads"
   tap_text "Downloads"
-  # Downloads grows on repeated runs; scroll to the newest, uniquely named fixture.
-  for _ in 1 2 3; do adb_cmd shell input swipe 360 1370 360 560 250; done
-  wait_text "$TEST_BOOK_FILE"
-  for _ in 1 2 3 4 5; do
+  # Downloads grows on repeated runs; scroll until the uniquely named fixture is visible.
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
     has_exact_text "$TEST_BOOK_FILE" && break
     adb_cmd shell input swipe 360 1370 360 560 250
     sleep 1
   done
   has_exact_text "$TEST_BOOK_FILE" || fail "No se pudo mostrar el archivo de prueba en Downloads."
+  wait_text "$TEST_BOOK_FILE"
   for _ in 1 2 3; do
     has_text "$TEST_BOOK_FILE" || break
     tap_file_tile "$TEST_BOOK_FILE"
@@ -139,6 +139,22 @@ fi
 tap_text "Leer $TEST_BOOK_TITLE"
 wait_text "Un libro de prueba"
 sleep 4
+tap_text "Abrir índice de contenidos"
+wait_text "Capítulo 1"
+capture reader-contents.png
+tap_text "Ir a Capítulo 1"
+tap_text "Añadir marcador"
+wait_text "Marcador guardado"
+tap_text "Cerrar marcadores"
+adb_cmd shell input keyevent 4
+wait_text "Tus libros"
+tap_text "Leer $TEST_BOOK_TITLE"
+wait_text "Un libro de prueba"
+tap_text "Abrir marcadores guardados"
+wait_text "Marcadores (1)"
+capture reader-bookmarks.png
+tap_text "Cerrar marcadores"
+
 tap_text "Abrir ajustes de lectura"
 wait_text "Papel"
 tap_text "Papel"
