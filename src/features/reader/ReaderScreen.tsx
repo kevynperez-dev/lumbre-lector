@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, BackHandler, Linking, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, BackHandler, Linking, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { ReadiumView } from 'react-native-readium';
 import type { Decoration, DecorationActivatedEvent, Link, Locator, Preferences, PublicationReadyEvent, ReadiumViewRef, SelectionActionEvent } from 'react-native-readium';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -340,6 +340,17 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
     }
   }
 
+  function confirmDeleteBookmark(bookmark: Bookmark) {
+    Alert.alert(
+      'Eliminar marcador',
+      `Se quitará el marcador “${bookmark.label}”.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Eliminar', style: 'destructive', onPress: () => void deleteBookmark(bookmark) },
+      ],
+    );
+  }
+
   async function saveAnnotation(kind: Annotation['kind'], locator: Locator, selectedText: string, noteText = ''): Promise<boolean> {
     if (!selectedText.trim()) {
       const message = 'Selecciona un fragmento de texto antes de guardarlo.';
@@ -445,6 +456,20 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
     } catch {
       setAnnotationMessage('No se pudo eliminar la anotación. Inténtalo de nuevo.');
     }
+  }
+
+  function confirmDeleteAnnotation(annotation: Annotation) {
+    const excerpt = annotation.selected_text.length > 70
+      ? `${annotation.selected_text.slice(0, 67)}…`
+      : annotation.selected_text;
+    Alert.alert(
+      annotation.kind === 'note' ? 'Eliminar nota' : 'Eliminar resaltado',
+      `Se quitará esta anotación: “${excerpt}”.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Eliminar', style: 'destructive', onPress: () => void deleteAnnotation(annotation) },
+      ],
+    );
   }
 
   function handleDecorationActivated(event: DecorationActivatedEvent) {
@@ -801,7 +826,7 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
                         <Pressable
                           accessibilityRole="button"
                           accessibilityLabel={`Eliminar marcador ${bookmark.label}`}
-                          onPress={() => void deleteBookmark(bookmark)}
+                          onPress={() => confirmDeleteBookmark(bookmark)}
                           className="min-h-11 justify-center rounded-full px-2"
                         >
                           <Text className={`text-sm font-semibold ${isDark ? 'text-red-200' : 'text-red-800'}`}>Quitar</Text>
@@ -828,7 +853,7 @@ export function ReaderScreen({ publication, onClose }: ReaderScreenProps) {
                         <Pressable
                           accessibilityRole="button"
                           accessibilityLabel={`Eliminar anotación ${annotation.selected_text}`}
-                          onPress={() => void deleteAnnotation(annotation)}
+                          onPress={() => confirmDeleteAnnotation(annotation)}
                           className="min-h-11 justify-center rounded-full px-2"
                         >
                           <Text className={`text-sm font-semibold ${isDark ? 'text-red-200' : 'text-red-800'}`}>Quitar</Text>

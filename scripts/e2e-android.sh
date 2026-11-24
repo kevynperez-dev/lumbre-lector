@@ -198,6 +198,10 @@ wait_text "Un libro de prueba"
 tap_text "Abrir marcadores guardados"
 wait_text "Marcadores (1)"
 capture reader-bookmarks.png
+tap_text "Eliminar marcador"
+wait_text "Se quitará el marcador"
+tap_text "Cancelar"
+wait_text "Marcadores (1)"
 tap_text "Notas y resaltados (1)"
 wait_text "Nota e2e persistente editada"
 capture reader-annotations-reopened.png
