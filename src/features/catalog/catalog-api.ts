@@ -18,6 +18,8 @@ export type CatalogPage = {
   books: CatalogBook[];
 };
 
+export type CatalogFilters = { language?: string; topic?: string };
+
 type GutendexBook = {
   id?: unknown;
   title?: unknown;
@@ -110,11 +112,16 @@ export function mapCatalogResponse(payload: unknown): CatalogPage {
   };
 }
 
-export function createCatalogUrl(search: string, page = 1): string {
+export function createCatalogUrl(search: string, page = 1, filters: CatalogFilters = {}): string {
   const url = new URL(GUTENDEX_API);
   url.searchParams.set('copyright', 'false');
   url.searchParams.set('mime_type', 'application/epub+zip');
-  url.searchParams.set('languages', 'es');
+  const language = (filters.language ?? 'es').trim().toLocaleLowerCase();
+  if (language !== 'all') {
+    url.searchParams.set('languages', /^[a-z]{2,3}$/.test(language) ? language : 'es');
+  }
+  const topic = filters.topic?.trim();
+  if (topic) url.searchParams.set('topic', topic);
   url.searchParams.set('page', String(Math.max(1, Math.floor(page))));
   const normalizedSearch = search.trim();
   if (normalizedSearch) url.searchParams.set('search', normalizedSearch);

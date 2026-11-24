@@ -61,6 +61,16 @@ test('builds encoded, constrained Spanish EPUB search URLs', () => {
   assert.equal(new URL(createCatalogUrl('', -8)).searchParams.get('page'), '1');
 });
 
+test('adds validated language and encoded subject filters to catalog searches', () => {
+  const url = new URL(createCatalogUrl('poesía', 1, { language: 'fr', topic: 'poésie & théâtre' }));
+  assert.equal(url.searchParams.get('languages'), 'fr');
+  assert.equal(url.searchParams.get('topic'), 'poésie & théâtre');
+  const allLanguages = new URL(createCatalogUrl('', 1, { language: 'all' }));
+  assert.equal(allLanguages.searchParams.has('languages'), false);
+  const invalidLanguage = new URL(createCatalogUrl('', 1, { language: '../' }));
+  assert.equal(invalidLanguage.searchParams.get('languages'), 'es');
+});
+
 test('accepts only Gutendex books pagination links', () => {
   assert.equal(
     validateCatalogPageUrl('https://gutendex.com/books/?page=2'),

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 
 import {
@@ -7,6 +7,7 @@ import {
   getCatalogErrorMessage,
   mapCatalogResponse,
   validateCatalogPageUrl,
+  type CatalogFilters,
   type CatalogBook,
 } from './catalog-api';
 import { downloadBook } from './epub-download';
@@ -18,9 +19,22 @@ type CatalogScreenProps = {
 
 type DownloadState = { progress: number | null; controller: AbortController };
 
+const LANGUAGE_OPTIONS = [
+  { code: 'es', label: 'Español' },
+  { code: 'en', label: 'English' },
+  { code: 'fr', label: 'Français' },
+  { code: 'de', label: 'Deutsch' },
+  { code: 'it', label: 'Italiano' },
+  { code: 'pt', label: 'Português' },
+  { code: 'all', label: 'Todos' },
+];
+
 export function CatalogScreen({ onDownloaded, isDark }: CatalogScreenProps) {
   const database = useSQLiteContext();
   const [searchText, setSearchText] = useState('');
+  const [topicText, setTopicText] = useState('');
+  const [authorFilter, setAuthorFilter] = useState('');
+  const [language, setLanguage] = useState('es');
   const [query, setQuery] = useState('');
   const [books, setBooks] = useState<CatalogBook[]>([]);
   const [next, setNext] = useState<string | null>(null);
@@ -31,6 +45,17 @@ export function CatalogScreen({ onDownloaded, isDark }: CatalogScreenProps) {
   const [downloadedIds, setDownloadedIds] = useState<number[]>([]);
   const [noticeAccepted, setNoticeAccepted] = useState(false);
   const activeRequest = useRef<AbortController | null>(null);
+  const visibleBooks = books.filter((book) =>
+    book.author.toLocaleLowerCase().includes(authorFilter.trim().toLocaleLowerCase()),
+  );
+
+  function currentFilters(): CatalogFilters {
+    return { language, topic: topicText };
+  }
+
+  function searchCatalog() {
+    if (noticeAccepted) void loadCatalog(createCatalogUrl(searchText, 1, currentFilters()));
+  }
 
   async function loadCatalog(url: string, append = false, requestedQuery = searchText.trim()) {
     activeRequest.current?.abort();
@@ -169,7 +194,7 @@ export function CatalogScreen({ onDownloaded, isDark }: CatalogScreenProps) {
           <Text className="text-sm leading-5 text-red-900 dark:text-red-100">{error}</Text>
           <Pressable
             accessibilityRole="button"
-            onPress={() => void loadCatalog(createCatalogUrl(searchText))}
+            onPress={searchCatalog}
             className="mt-3 self-start rounded-full px-2 py-1"
           >
             <Text className="font-semibold text-red-900 dark:text-red-100">Intentar de nuevo</Text>
@@ -183,7 +208,7 @@ export function CatalogScreen({ onDownloaded, isDark }: CatalogScreenProps) {
           value={searchText}
           onChangeText={setSearchText}
           onSubmitEditing={() => {
-            if (noticeAccepted) void loadCatalog(createCatalogUrl(searchText));
+            searchCatalog();
           }}
           returnKeyType="search"
           placeholder="Título o autor"
@@ -194,16 +219,62 @@ export function CatalogScreen({ onDownloaded, isDark }: CatalogScreenProps) {
           accessibilityRole="button"
           accessibilityLabel="Buscar libros"
           disabled={isLoading || !noticeAccepted}
-          onPress={() => void loadCatalog(createCatalogUrl(searchText))}
+            onPress={searchCatalog}
           className="rounded-full bg-paper-green px-4 py-2.5 dark:bg-night-green"
         >
           <Text className="font-semibold text-white dark:text-night-canvas">Buscar</Text>
         </Pressable>
       </View>
 
+      <View className="mt-4">
+        <Text className={`mb-2 text-sm font-semibold ${ink}`}>Idioma</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+          {LANGUAGE_OPTIONS.map((option) => {
+            const selected = language === option.code;
+            return (
+              <Pressable
+                key={option.code}
+                accessibilityRole="tab"
+                accessibilityState={{ selected }}
+                onPress={() => setLanguage(option.code)}
+                className={`rounded-full border px-4 py-2 ${selected ? (isDark ? 'border-night-green bg-night-green' : 'border-paper-green bg-paper-green') : (isDark ? 'border-night-line bg-night-surface' : 'border-paper-line bg-paper-surface')}`}
+              >
+                <Text className={`text-xs font-semibold ${selected ? (isDark ? 'text-night-canvas' : 'text-white') : ink}`}>
+                  {option.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      <View className="mt-3 flex-row gap-2">
+        <View className={`flex-1 rounded-xl border px-3 ${surface}`}>
+          <TextInput
+            accessibilityLabel="Filtrar por tema"
+            value={topicText}
+            onChangeText={setTopicText}
+            placeholder="Tema"
+            placeholderTextColor={isDark ? '#A9ADA5' : '#69716A'}
+            className={`min-h-12 text-sm ${ink}`}
+          />
+        </View>
+        <View className={`flex-1 rounded-xl border px-3 ${surface}`}>
+          <TextInput
+            accessibilityLabel="Filtrar resultados por autor"
+            value={authorFilter}
+            onChangeText={setAuthorFilter}
+            placeholder="Autor en resultados"
+            placeholderTextColor={isDark ? '#A9ADA5' : '#69716A'}
+            className={`min-h-12 text-sm ${ink}`}
+          />
+        </View>
+      </View>
+      <Text className={`mt-2 text-xs ${subtle}`}>Formato disponible: EPUB · El filtro de autor se aplica a los resultados cargados.</Text>
+
       <View className="mt-6 flex-row items-center justify-between border-b border-paper-line pb-3 dark:border-night-line">
         <Text className={`font-editorial text-2xl ${ink}`}>
-          {query ? `Resultados para “${query}”` : 'Libros en español'}
+          {query ? `Resultados para “${query}”` : language === 'es' ? 'Libros en español' : 'Libros disponibles'}
         </Text>
         {isLoading ? <ActivityIndicator accessibilityLabel="Buscando libros" color={isDark ? '#A6C7A8' : '#315B4B'} /> : null}
       </View>
@@ -214,14 +285,18 @@ export function CatalogScreen({ onDownloaded, isDark }: CatalogScreenProps) {
         </Text>
       ) : null}
 
-      {books.length === 0 && !isLoading ? (
+      {visibleBooks.length === 0 && !isLoading ? (
         <Text className={`mt-5 text-base leading-6 ${subtle}`}>
-          {error ? 'No se muestran resultados hasta que la conexión funcione.' : 'No encontramos libros con EPUB para esta búsqueda.'}
+          {error
+            ? 'No se muestran resultados hasta que la conexión funcione.'
+            : books.length > 0
+              ? 'Ningún resultado cargado coincide con este autor.'
+              : 'No encontramos libros con EPUB para esta búsqueda.'}
         </Text>
       ) : null}
 
       <View className="mt-4 gap-3">
-        {books.map((book) => {
+        {visibleBooks.map((book) => {
           const download = downloads[book.id];
           const isDownloaded = downloadedIds.includes(book.id);
           return (
