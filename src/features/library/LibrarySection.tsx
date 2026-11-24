@@ -7,6 +7,7 @@ import { formatStorageSize, selectAndSortBooks, type LibrarySort } from './libra
 type LibrarySectionProps = {
   books: Publication[];
   collections: Collection[];
+  availableDiskSpace: number | null;
   isDark: boolean;
   isImporting: boolean;
   importError: string | null;
@@ -29,6 +30,7 @@ const SORT_OPTIONS: { value: LibrarySort; label: string }[] = [
 export function LibrarySection({
   books,
   collections,
+  availableDiskSpace,
   isDark,
   isImporting,
   importError,
@@ -120,6 +122,11 @@ export function LibrarySection({
       <Text className={`mt-3 text-sm ${subtle}`}>
         {books.length} {books.length === 1 ? 'libro' : 'libros'} · {formatStorageSize(storageSize)} en este dispositivo
       </Text>
+      {availableDiskSpace !== null ? (
+        <Text className={`mt-1 text-xs ${subtle}`}>
+          {formatStorageSize(availableDiskSpace)} libres en el almacenamiento del dispositivo
+        </Text>
+      ) : null}
 
       {importError || libraryError || localError ? (
         <View accessibilityRole="alert" className="mt-4 rounded-xl bg-red-100 px-4 py-3 dark:bg-red-950">

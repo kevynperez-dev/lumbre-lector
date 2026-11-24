@@ -4,6 +4,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 
 import {
   createCatalogUrl,
+  downloadedCatalogIds,
   getCatalogErrorMessage,
   mapCatalogResponse,
   validateCatalogPageUrl,
@@ -56,6 +57,16 @@ export function CatalogScreen({ onDownloaded, isDark }: CatalogScreenProps) {
   function searchCatalog() {
     if (noticeAccepted) void loadCatalog(createCatalogUrl(searchText, 1, currentFilters()));
   }
+
+  useEffect(() => {
+    let isMounted = true;
+    void database.getAllAsync<{ id: string }>(
+      "SELECT id FROM publications WHERE source_name = 'Project Gutenberg'",
+    ).then((rows) => {
+      if (isMounted) setDownloadedIds(downloadedCatalogIds(rows.map(({ id }) => id)));
+    }).catch(() => undefined);
+    return () => { isMounted = false; };
+  }, [database]);
 
   async function loadCatalog(url: string, append = false, requestedQuery = searchText.trim()) {
     activeRequest.current?.abort();

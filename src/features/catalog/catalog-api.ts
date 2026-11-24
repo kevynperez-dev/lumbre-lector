@@ -20,6 +20,15 @@ export type CatalogPage = {
 
 export type CatalogFilters = { language?: string; topic?: string };
 
+export function downloadedCatalogIds(publicationIds: string[]): number[] {
+  const prefix = 'gutenberg-';
+  return [...new Set(publicationIds.flatMap((id) => {
+    if (!id.startsWith(prefix)) return [];
+    const bookId = Number(id.slice(prefix.length));
+    return Number.isSafeInteger(bookId) && bookId > 0 ? [bookId] : [];
+  }))];
+}
+
 type GutendexBook = {
   id?: unknown;
   title?: unknown;

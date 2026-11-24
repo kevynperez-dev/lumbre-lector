@@ -3,7 +3,7 @@ import './global.css';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { SQLiteProvider, useSQLiteContext } from 'expo-sqlite';
-import { File } from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useColorScheme } from 'nativewind';
@@ -27,6 +27,7 @@ function AppContent() {
   const [activeTab, setActiveTab] = useState<Tab>('library');
   const [books, setBooks] = useState<Publication[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
+  const [availableDiskSpace, setAvailableDiskSpace] = useState<number | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [selectedBook, setSelectedBook] = useState<Publication | null>(null);
@@ -96,6 +97,7 @@ function AppContent() {
        ORDER BY COALESCE(p.last_opened_at, p.added_at) DESC`,
     );
     setBooks(rows);
+    setAvailableDiskSpace(Paths.availableDiskSpace);
   }
 
   async function refreshCollections() {
@@ -183,6 +185,7 @@ function AppContent() {
         if (isMounted) {
           setBooks(rows);
           setCollections(savedCollections);
+          setAvailableDiskSpace(Paths.availableDiskSpace);
         }
       } catch {
         if (isMounted) setBooks([]);
@@ -232,6 +235,7 @@ function AppContent() {
               <LibrarySection
                 books={books}
                 collections={collections}
+                availableDiskSpace={availableDiskSpace}
                 isDark={isDark}
                 isImporting={isImporting}
                 importError={importError}

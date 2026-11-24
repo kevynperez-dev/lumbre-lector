@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createCatalogUrl, getCatalogErrorMessage, mapCatalogResponse, validateCatalogPageUrl } from '../../src/features/catalog/catalog-api.ts';
+import { createCatalogUrl, downloadedCatalogIds, getCatalogErrorMessage, mapCatalogResponse, validateCatalogPageUrl } from '../../src/features/catalog/catalog-api.ts';
 
 const book = (overrides: Record<string, unknown> = {}) => ({
   id: 11,
@@ -69,6 +69,10 @@ test('adds validated language and encoded subject filters to catalog searches', 
   assert.equal(allLanguages.searchParams.has('languages'), false);
   const invalidLanguage = new URL(createCatalogUrl('', 1, { language: '../' }));
   assert.equal(invalidLanguage.searchParams.get('languages'), 'es');
+});
+
+test('restores downloaded catalog ids from persisted Gutenberg publications', () => {
+  assert.deepEqual(downloadedCatalogIds(['gutenberg-31', 'local-1', 'gutenberg-12', 'gutenberg-31', 'gutenberg-invalid']), [31, 12]);
 });
 
 test('accepts only Gutendex books pagination links', () => {
