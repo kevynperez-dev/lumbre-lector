@@ -58,6 +58,11 @@ export function CatalogScreen({ onDownloaded, isDark }: CatalogScreenProps) {
     if (noticeAccepted) void loadCatalog(createCatalogUrl(searchText, 1, currentFilters()));
   }
 
+  function retryCatalog() {
+    if (books.length > 0 && next) void loadCatalog(next, true, query);
+    else searchCatalog();
+  }
+
   useEffect(() => {
     let isMounted = true;
     void database.getAllAsync<{ id: string }>(
@@ -72,6 +77,10 @@ export function CatalogScreen({ onDownloaded, isDark }: CatalogScreenProps) {
     activeRequest.current?.abort();
     const controller = new AbortController();
     activeRequest.current = controller;
+    if (!append) {
+      setBooks([]);
+      setNext(null);
+    }
     setIsLoading(true);
     setError(null);
 
@@ -205,7 +214,7 @@ export function CatalogScreen({ onDownloaded, isDark }: CatalogScreenProps) {
           <Text className="text-sm leading-5 text-red-900 dark:text-red-100">{error}</Text>
           <Pressable
             accessibilityRole="button"
-            onPress={searchCatalog}
+            onPress={retryCatalog}
             className="mt-3 self-start rounded-full px-2 py-1"
           >
             <Text className="font-semibold text-red-900 dark:text-red-100">Intentar de nuevo</Text>
@@ -296,13 +305,11 @@ export function CatalogScreen({ onDownloaded, isDark }: CatalogScreenProps) {
         </Text>
       ) : null}
 
-      {visibleBooks.length === 0 && !isLoading ? (
+      {visibleBooks.length === 0 && !isLoading && !error ? (
         <Text className={`mt-5 text-base leading-6 ${subtle}`}>
-          {error
-            ? 'No se muestran resultados hasta que la conexión funcione.'
-            : books.length > 0
-              ? 'Ningún resultado cargado coincide con este autor.'
-              : 'No encontramos libros con EPUB para esta búsqueda.'}
+          {books.length > 0
+            ? 'Ningún resultado cargado coincide con este autor.'
+            : 'No encontramos libros con EPUB para esta búsqueda.'}
         </Text>
       ) : null}
 
