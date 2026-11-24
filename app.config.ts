@@ -24,6 +24,7 @@ const config = {
           },
         },
       ],
+      './plugins/with-core-library-desugaring',
     ],
     android: {
       package: 'app.lumbre.reader',

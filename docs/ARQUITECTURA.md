@@ -70,7 +70,7 @@ Un libro de Project Gutenberg puede tener condiciones y estatus distintos según
 
 ## Lector y formatos
 
-Se eligió `react-native-readium` 5.3 (MIT), puente React Native sobre Readium Kotlin, como motor EPUB. Acepta publicaciones locales y expone locator, eventos de posición y preferencias de tema/tipografía. Al ser nativo requiere development build Expo; el proyecto configura Kotlin 2.3.20 y compile SDK 37 con `expo-build-properties` (JDK 17 en la máquina de build). Esta elección resuelve el spike inicial; falta validar apertura, TalkBack, memoria y navegación en Android físico/emulador antes de cerrar la fase. No declarar compatibilidad con DRM.
+Se eligió `react-native-readium` 5.3 (MIT), puente React Native sobre Readium Kotlin, como motor EPUB. Acepta publicaciones locales y expone locator, eventos de posición y preferencias de tema/tipografía. Al ser nativo requiere development build Expo; el proyecto configura Kotlin 2.3.20 y compile SDK 37 con `expo-build-properties` (JDK 17 en la máquina de build). Readium 3.3 requiere core library desugaring `2.1.5`; el config plugin lo incorpora a Gradle generado y conserva el `ReaderViewModel` que el wrapper instancia por reflexión al minificar release. La apertura de un EPUB propio se verificó en un APK release en emulador API 36. Restan TalkBack, memoria, navegación compleja y más publicaciones en Android físico/emulador. No declarar compatibilidad con DRM.
 
 La posición debe usar locator estable (por ejemplo, identificador de recurso + fragmento/progresión/CFI según formato), no solo número de página visual. Los EPUB reflowables cambian paginación al personalizar.
 
