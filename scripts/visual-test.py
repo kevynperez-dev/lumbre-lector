@@ -31,6 +31,18 @@ for mode, filename in zip(expected, sys.argv[1:]):
     brightness = sum(ImageStat.Stat(center).mean) / 3
     results[mode] = {"size": list(image.size), "reading_surface_mean_rgb": round(brightness, 2)}
 
+    if mode == "dark":
+        # The reader preference can differ from the app-wide NativeWind theme.
+        # Its dark toolbar still needs the reader's light-green action labels.
+        toolbar = image.crop((0, int(image.height * 0.11), image.width, int(image.height * 0.18)))
+        contrast_ink = sum(
+            1 for red, green, blue in toolbar.getdata()
+            if green >= 135 and green > red * 1.15 and green > blue * 0.9
+        )
+        results[mode]["toolbar_contrast_pixels"] = contrast_ink
+        if contrast_ink < 40:
+            raise SystemExit(f"night reader toolbar labels are missing or too dim: {results}")
+
 if not results["light"]["reading_surface_mean_rgb"] > results["sepia"]["reading_surface_mean_rgb"] > results["dark"]["reading_surface_mean_rgb"]:
     raise SystemExit(f"reader palettes are not ordered light > sepia > dark: {results}")
 if results["light"]["reading_surface_mean_rgb"] < 175:
