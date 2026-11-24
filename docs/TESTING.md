@@ -16,7 +16,7 @@ npm test
 npm run typecheck
 ```
 
-Las pruebas unitarias cubren la normalización de Gutendex, filtro conservador por derechos, URL/paginación y filtros de idioma/tema, restauración de ids de libros descargados, origen HTTPS permitido, estructura inicial obligatoria del EPUB, límite de tamaño, aviso legal, creación acotada de notas/resaltados, filtrado/orden y formato de tamaño de biblioteca, resolución de preferencias por publicación, además del flujo de descarga con runtime simulado: éxito, progreso, idempotencia, cancelación, EPUB inválido y fallo al guardar metadatos. Las pruebas de integración ejecutan las migraciones SQL reales con SQLite y comprueban upgrade desde v1, constraints, borrado en cascada, unicidad/asignación de colecciones, actualización idempotente de preferencias y edición persistente de notas. La suite local actual contiene 35 pruebas.
+Las pruebas unitarias cubren la normalización de Gutendex, filtro conservador por derechos, URL/paginación y filtros de idioma/tema, restauración de ids de libros descargados, origen HTTPS permitido, estructura inicial obligatoria del EPUB, límite de tamaño durante la transferencia, aviso legal, creación acotada de notas/resaltados, filtrado/orden y formato de tamaño de biblioteca, resolución de preferencias por publicación, además del flujo de descarga con runtime simulado: éxito, progreso, idempotencia, cancelación, EPUB inválido, exceso de tamaño y fallo al guardar metadatos. Las pruebas de integración ejecutan las migraciones SQL reales con SQLite y comprueban upgrade desde v1, constraints, borrado en cascada, unicidad/asignación de colecciones, actualización idempotente de preferencias y edición persistente de notas. La suite local actual contiene 36 pruebas.
 
 ## E2E Android
 

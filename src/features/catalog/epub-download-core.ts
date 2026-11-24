@@ -53,8 +53,19 @@ export async function downloadEpub(
   const published = runtime.file(`${bookId}.epub`);
   if (partial.exists) partial.delete();
 
+  const transferController = new AbortController();
+  let exceedsLimit = false;
+  const cancelForCaller = () => transferController.abort(signal.reason);
+  if (signal.aborted) cancelForCaller();
+  else signal.addEventListener('abort', cancelForCaller, { once: true });
+
   try {
-    const downloaded = await runtime.download(url, partial, signal, (bytesWritten, totalBytes) => {
+    const downloaded = await runtime.download(url, partial, transferController.signal, (bytesWritten, totalBytes) => {
+      if (bytesWritten > MAX_EPUB_SIZE || totalBytes > MAX_EPUB_SIZE) {
+        exceedsLimit = true;
+        transferController.abort();
+        return;
+      }
       onProgress(totalBytes > 0 ? Math.min(1, bytesWritten / totalBytes) : null);
     });
 
@@ -77,11 +88,15 @@ export async function downloadEpub(
     return 'downloaded';
   } catch (error) {
     if (published.exists) published.delete();
+    if (exceedsLimit) {
+      throw new Error('El archivo descargado supera el límite de 100 MB.');
+    }
     if (signal.aborted) throw error;
     throw error instanceof Error
       ? error
       : new Error('No se pudo descargar el EPUB. Comprueba tu conexión e inténtalo otra vez.');
   } finally {
+    signal.removeEventListener('abort', cancelForCaller);
     if (partial.exists) partial.delete();
   }
 }

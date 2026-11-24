@@ -7,6 +7,7 @@ import {
   type DownloadFile,
   type EpubDownloadRuntime,
 } from '../../src/features/catalog/epub-download-core.ts';
+import { MAX_EPUB_SIZE } from '../../src/domain/epub.ts';
 
 const book: CatalogBook = {
   id: 31,
@@ -122,6 +123,22 @@ test('propagates cancellation and cleans the incomplete transfer', async () => {
   );
   assert.equal(fake.publications.size, 0);
   assert.equal(fake.files.get('file:///books/gutenberg-31.part')?.bytes, null);
+});
+
+test('aborts oversized downloads as soon as reported progress exceeds the limit', async () => {
+  const fake = fakeRuntime();
+  fake.runtime.download = async (_url, destination, signal, onProgress) => {
+    onProgress(MAX_EPUB_SIZE + 1, MAX_EPUB_SIZE + 1);
+    assert.equal(signal.aborted, true);
+    throw new Error('transfer aborted');
+  };
+  await assert.rejects(
+    downloadEpub(fake.runtime, book, new AbortController().signal, () => undefined),
+    /supera el límite de 100 MB/,
+  );
+  assert.equal(fake.publications.size, 0);
+  assert.equal(fake.files.get('file:///books/gutenberg-31.part')?.bytes, null);
+  assert.equal(fake.files.get('file:///books/gutenberg-31.epub')?.bytes, null);
 });
 
 test('does not download an already stored publication again', async () => {
